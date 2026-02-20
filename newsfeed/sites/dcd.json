@@ -1,0 +1,27 @@
+{
+    "name": "DataCenterDynamics",
+    "listing_url": "https://datacenterdynamics.com/en/news/",
+    "pagination": "?page={n}",
+    "source_type": "news",
+    "poll_frequency_days": 1,
+    "request_delay": 1.0,
+    "max_retries": 3,
+    "eager_fetch": true,
+    "listing_pattern": "\\*\\s+!\\[Image[^\\]]*\\]\\(([^)]+)\\)(\\d{1,2}\\s+\\w{3}\\s+\\d{4})\\s+\\[([^\\]]+)\\]\\(([^)]+)\\)\\n=+\\n\\n(.+?)\\s*$",
+    "listing_fields": ["image_url", "date_raw", "title", "url", "summary"],
+    "date_format": "%d %b %Y",
+    "content_start": "^(January|February|March|April|May|June|July|August|September|October|November|December) \\d{1,2}, \\d{4}|^\\d{1,2} \\w{3,9} \\d{4}.*\\bBy\\b",
+    "content_end": "^(More in |Subscribe to |### Tags|Get a weekly)",
+    "pipeline": [
+        "extract_jina_meta",
+        "remove_noise",
+        "extract_body",
+        "strip_byline",
+        "strip_links",
+        "strip_images",
+        "decode_entities",
+        "normalize_whitespace",
+	"summarize",
+	"auto_tag"
+    ]
+}

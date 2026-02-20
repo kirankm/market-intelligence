@@ -1,0 +1,16 @@
+{
+    "Expansion": ["new build", "campus", "expansion", "develop", "construction", "groundbreaking", "planned"],
+    "Acquisition": ["acquire", "acquisition", "merger", "takeover", "stake", "buyout"],
+    "Partnership": ["partner", "partnership", "collaboration", "deal", "agreement", "signs", "contract"],
+    "Funding": ["funding", "raises", "investment", "series a", "series b", "ipo", "debt", "financing"],
+    "Solar": ["solar", "ppa", "renewables", "clean energy", "wind"],
+    "AI": ["artificial intelligence", "ai ", "gpu", "inference", "machine learning"],
+    "Colocation": ["colocation", "colo", "wholesale"],
+    "Edge": ["edge computing", "edge data center", "low-latency"],
+    "Submarine Cable": ["subsea", "submarine cable", "fiber cable"],
+    "Regulatory": ["moratorium", "tax credit", "regulation", "governor", "legislation", "pause"],
+    "Sustainability": ["carbon", "emissions", "water", "cooling", "waste heat", "energy storage"],
+    "Quantum": ["quantum computing", "quantum computer", "qubit"],
+    "Telecom": ["5g", "4g", "lte", "carrier", "telco", "telecom", "ran", "spectrum"]
+}
+
