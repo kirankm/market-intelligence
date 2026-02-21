@@ -1,0 +1,36 @@
+"""Filter state management."""
+from dataclasses import dataclass, field
+
+from datetime import date, timedelta
+
+@dataclass
+class FilterState:
+    tags: set = field(default_factory=set)
+    source: str = ''
+    date: str = ''
+    expanded: bool = False
+
+    def to_params(self):
+        """Convert to URL params dict."""
+        return {
+            'tags': ','.join(sorted(self.tags)) if self.tags else '',
+            'source': self.source,
+            'date': self.date,
+            'expanded': '1' if self.expanded else '0',
+        }
+
+    @classmethod
+    def from_request(cls, tags='', source='', date='', expanded='0'):
+        """Parse from request query params."""
+        parsed_tags = {t.strip() for t in tags.split(',') if t.strip()}
+        return cls(tags=parsed_tags, source=source,
+                   date=date, expanded=expanded == '1')
+
+
+def date_range(period):
+    """Convert period string to (date_from, date_to)."""
+    today = date.today()
+    if period == 'today': return today, today
+    if period == 'week':  return today - timedelta(days=today.weekday()), today
+    if period == 'month': return today.replace(day=1), today
+    return None, None
