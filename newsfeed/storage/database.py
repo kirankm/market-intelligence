@@ -7,11 +7,16 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 class Base(DeclarativeBase):
     pass
 
+_engine = None
+
 def get_engine():
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise ValueError("DATABASE_URL not set in environment")
-    return create_engine(url)
+    global _engine
+    if _engine is None:
+        url = os.environ.get("DATABASE_URL")
+        if not url:
+            raise ValueError("DATABASE_URL not set in environment")
+        _engine = create_engine(url)
+    return _engine
 
 def get_session():
     engine = get_engine()
