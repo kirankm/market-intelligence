@@ -3,7 +3,8 @@ from fasthtml.common import *
 from urllib.parse import urlencode
 from newsfeed.web.filters import FilterState
 import json
-
+import re as re_module
+from fasthtml.common import *
 
 # ── URL Helper ──────────────────────────────────────────────
 
@@ -55,26 +56,27 @@ def star_icon(starred, article_id):
         hx_swap="outerHTML"
     )
 
-
-def summary_section(summary):
+def summary_section(summary, search=''):
     """Render subtitle and bullets from summary."""
     if not summary: return P("No summary available", cls="text-sm text-gray-400 italic")
     bullets = summary.bullets or []
+    subtitle = highlight(summary.subtitle, search) if search else summary.subtitle
     return Div(
-        P(summary.subtitle, cls="text-sm font-medium mt-2") if summary.subtitle else None,
-        Ul(*[Li(b, cls="text-sm text-gray-600") for b in bullets], cls="list-disc ml-5 mt-1"),
+        P(subtitle, cls="text-sm font-medium mt-2") if summary.subtitle else None,
+        Ul(*[Li(highlight(b, search) if search else b, cls="text-sm text-gray-600")
+             for b in bullets], cls="list-disc ml-5 mt-1"),
     )
 
-
-def article_card(article, tags, starred):
+def article_card(article, tags, starred, search=''):
     """Render a collapsed article card."""
     source_name = article.source.name if article.source else "Unknown"
+    title = highlight(article.title, search) if search else article.title
     return Div(
         Div(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(article.title, cls="cursor-pointer"),
-                    hx_get=f"/feed/article/{article.id}/expand",
+                Div(Strong(title, cls="cursor-pointer"),
+                    hx_get=f"/feed/article/{article.id}/expand?search={search}",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML",
                     onclick="collapseExpanded(this)"),
@@ -87,20 +89,20 @@ def article_card(article, tags, starred):
         id=f"article-{article.id}"
     )
 
-
-def expanded_card(article, tags, starred, summary):
+def expanded_card(article, tags, starred, summary, search=''):
     """Render an expanded article card with summary."""
     source_name = article.source.name if article.source else "Unknown"
+    title = highlight(article.title, search) if search else article.title
     return Div(
         Div(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(article.title, cls="cursor-pointer"),
+                Div(Strong(title, cls="cursor-pointer"),
                     hx_get=f"/feed/article/{article.id}/collapse",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML"),
                 card_meta(article, source_name, tags),
-                summary_section(summary),
+                summary_section(summary, search),
                 A("🔗 Read original", href=article.url, target="_blank",
                   cls="text-sm text-blue-600 mt-2 inline-block"),
                 cls="flex-1"
@@ -110,7 +112,6 @@ def expanded_card(article, tags, starred, summary):
         cls="p-3 border-b bg-gray-50 expanded",
         id=f"article-{article.id}"
     )
-
 
 # ── Filter Components ───────────────────────────────────────
 
@@ -196,4 +197,50 @@ def date_filter(state):
         Span("Date: ", cls="text-sm font-medium"),
         *[date_button(label, period, state) for label, period in buttons],
         cls="flex items-center gap-2"
+    )
+
+def search_box(state, debounce=300):
+    """Render search input with debounced HTMX."""
+    return Div(
+        Span("🔍 ", cls="text-sm"),
+        Input(type="text", name="search", value=state.search,
+              placeholder="Search title/summary...",
+              hx_get=build_filter_url(state, search=''),
+              hx_target="#feed-content", hx_swap="outerHTML",
+              hx_trigger=f"keyup changed delay:{debounce}ms",
+              hx_include="this",
+              cls="text-sm border rounded px-2 py-1 w-64"),
+        cls="flex items-center gap-1"
+    )
+
+def highlight(text, term):
+    """Wrap matching term in <mark> tags, case-insensitive."""
+    if not term or not text: return text
+    parts = re_module.split(f'({re_module.escape(term)})', text, flags=re_module.IGNORECASE)
+    return Span(*[Mark(p) if p.lower() == term.lower() else p for p in parts])
+
+def load_more_sentinel(state, offset, page_size):
+    """Hidden div that triggers next page load when scrolled into view."""
+    base = build_filter_url(state).replace('/feed?', '/feed/more?')
+    if '?' not in base: base = '/feed/more?'
+    url = f"{base}&offset={offset}&page_size={page_size}"
+    return Div(hx_get=url,
+               hx_trigger="revealed",
+               hx_swap="outerHTML",
+               cls="h-1")
+
+def collapsible_section(title, content, section_id, open=False):
+    """Render a collapsible section with toggle."""
+    icon = "▼" if open else "►"
+    return Div(
+        Div(
+            Span(f"{icon} {title}", cls="text-lg font-bold cursor-pointer"),
+            hx_get=f"/executive/section/{section_id}?open={'0' if open else '1'}",
+            hx_target=f"#section-{section_id}",
+            hx_swap="outerHTML",
+            cls="p-3 border-b hover:bg-gray-50"
+        ),
+        Div(content, cls="p-3") if open else None,
+        id=f"section-{section_id}",
+        cls="border rounded mb-4"
     )

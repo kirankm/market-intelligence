@@ -1,9 +1,11 @@
 """Feed page queries."""
-from sqlalchemy import desc
+from sqlalchemy import desc, or_, cast, String
 from sqlalchemy import func as sqla_func
 from sqlalchemy.orm import joinedload
 from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSummary, Tag
 from newsfeed.storage.models import AppSetting, Source
+from newsfeed.storage.models import ArticleSummary
+
 
 def get_setting(db, key, default='5'):
     """Fetch a setting value from app_settings."""
@@ -13,6 +15,27 @@ def get_setting(db, key, default='5'):
 def get_articles(db, limit=20, offset=0, tags=None, source=None, date_from=None, date_to=None):
     """Fetch articles, optionally filtered by tags and source."""
     q = (db.query(Article)
+         .options(joinedload(Article.source),
+                  joinedload(Article.tags).joinedload(ArticleTag.tag),
+                  joinedload(Article.stars))
+         .order_by(desc(Article.date)))
+    if tags:
+        q = (q.join(ArticleTag).join(Tag)
+             .filter(Tag.name.in_(tags), ArticleTag.removed == False)
+             .group_by(Article.id)
+             .having(sqla_func.count(sqla_func.distinct(Tag.name)) == len(tags)))
+    if source:
+        q = q.join(Source).filter(Source.name == source)
+    if date_from:
+        q = q.filter(Article.date >= date_from)
+    if date_to:
+        q = q.filter(Article.date <= date_to)
+    return q.limit(limit).offset(offset).all()
+
+def get_starred_articles(db, limit=20, offset=0, tags=None, source=None, date_from=None, date_to=None):
+    """Fetch articles that have at least one star."""
+    q = (db.query(Article)
+         .join(ArticleStar)
          .options(joinedload(Article.source),
                   joinedload(Article.tags).joinedload(ArticleTag.tag),
                   joinedload(Article.stars))
@@ -88,4 +111,20 @@ def get_sources_with_counts(db):
             .join(Article, Source.id == Article.source_id)
             .group_by(Source.name)
             .order_by(Source.name)
+            .all())
+
+def search_articles(db, query, limit=20, offset=0):
+    """Search articles by title, subtitle, and bullets using ILIKE."""
+    term = f"%{query}%"
+    return (db.query(Article)
+            .outerjoin(ArticleSummary)
+            .options(joinedload(Article.source),
+                     joinedload(Article.tags).joinedload(ArticleTag.tag),
+                     joinedload(Article.stars))
+            .filter(or_(
+                Article.title.ilike(term),
+                ArticleSummary.subtitle.ilike(term),
+                cast(ArticleSummary.bullets, String).ilike(term)))
+            .order_by(desc(Article.date))
+            .limit(limit).offset(offset)
             .all())
