@@ -8,6 +8,7 @@ class Base(DeclarativeBase):
     pass
 
 _engine = None
+_SessionFactory = None
 
 def get_engine():
     global _engine
@@ -19,9 +20,10 @@ def get_engine():
     return _engine
 
 def get_session():
-    engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    return Session()
+    global _SessionFactory
+    if _SessionFactory is None:
+       _SessionFactory = sessionmaker(bind=get_engine())
+    return _SessionFactory()
 
 def init_db():
     """Create all tables."""

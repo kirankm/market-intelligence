@@ -5,6 +5,7 @@ load_dotenv()
 from newsfeed.storage.database import get_session
 from newsfeed.web.routes.auth import ar as auth_routes
 from newsfeed.web.routes.feed import ar as feed_routes
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 def before(req, session):
@@ -14,11 +15,18 @@ def after(req, resp):
     if hasattr(req.state, 'db'):
         req.state.db.close()
 
+class DBSessionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        request.state.db = get_session()
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            request.state.db.close()
 
 hdrs = Theme.blue.headers()
-app, rt = fast_app(hdrs=hdrs, secret_key='dev-secret',
-                   before=Beforeware(before),
-                   after=after)
+app, rt = fast_app(hdrs=hdrs, secret_key='dev-secret')
+app.add_middleware(DBSessionMiddleware)
 
 auth_routes.to_app(app)
 feed_routes.to_app(app)

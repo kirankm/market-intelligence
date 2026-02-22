@@ -1,29 +1,34 @@
 """Feed page queries."""
 from sqlalchemy import desc
+from sqlalchemy import func as sqla_func
 from sqlalchemy.orm import joinedload
-from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSummary
+from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSummary, Tag
+from newsfeed.storage.models import AppSetting, Source
 
+def get_setting(db, key, default='5'):
+    """Fetch a setting value from app_settings."""
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    return row.value if row else default
 
-def get_articles(db, limit=20, offset=0):
-    """Fetch articles with source, newest first."""
-    return (db.query(Article)
-            .options(joinedload(Article.source),
-                     joinedload(Article.tags).joinedload(ArticleTag.tag),
-                     joinedload(Article.stars))
-            .order_by(desc(Article.date))
-            .limit(limit).offset(offset)
-            .all())
-
-
-def article_tags(article):
-    """Get active tag names for an article."""
-    return [at.tag.name for at in article.tags
-            if not at.removed]
-
-
-def is_starred(article, user_id):
-    """Check if user has starred this article."""
-    return any(s.user_id == user_id for s in article.stars)
+def get_articles(db, limit=20, offset=0, tags=None, source=None, date_from=None, date_to=None):
+    """Fetch articles, optionally filtered by tags and source."""
+    q = (db.query(Article)
+         .options(joinedload(Article.source),
+                  joinedload(Article.tags).joinedload(ArticleTag.tag),
+                  joinedload(Article.stars))
+         .order_by(desc(Article.date)))
+    if tags:
+        q = (q.join(ArticleTag).join(Tag)
+             .filter(Tag.name.in_(tags), ArticleTag.removed == False)
+             .group_by(Article.id)
+             .having(sqla_func.count(sqla_func.distinct(Tag.name)) == len(tags)))
+    if source:
+        q = q.join(Source).filter(Source.name == source)
+    if date_from:
+        q = q.filter(Article.date >= date_from)
+    if date_to:
+        q = q.filter(Article.date <= date_to)
+    return q.limit(limit).offset(offset).all()
 
 def get_article(db, article_id):
     """Fetch single article with relations."""
@@ -41,3 +46,46 @@ def get_latest_summary(db, article_id):
             .filter(ArticleSummary.article_id == article_id)
             .order_by(desc(ArticleSummary.version))
             .first())
+
+
+def article_tags(article):
+    """Get active tag names for an article."""
+    return [at.tag.name for at in article.tags if not at.removed]
+
+
+def is_starred(article, user_id):
+    """Check if user has starred this article."""
+    return any(s.user_id == user_id for s in article.stars)
+
+
+def toggle_star(db, article_id, user_id):
+    """Toggle star — returns True if now starred, False if unstarred."""
+    existing = (db.query(ArticleStar)
+                .filter(ArticleStar.article_id == article_id,
+                        ArticleStar.user_id == user_id)
+                .first())
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return False
+    db.add(ArticleStar(article_id=article_id, user_id=user_id))
+    db.commit()
+    return True
+
+
+def get_tags_with_counts(db):
+    """Get all tags with their article counts."""
+    return (db.query(Tag.name, sqla_func.count(ArticleTag.article_id).label('count'))
+            .join(ArticleTag, Tag.id == ArticleTag.tag_id)
+            .filter(ArticleTag.removed == False)
+            .group_by(Tag.name)
+            .order_by(sqla_func.count(ArticleTag.article_id).desc())
+            .all())
+
+def get_sources_with_counts(db):
+    """Get all sources with their article counts."""
+    return (db.query(Source.name, sqla_func.count(Article.id).label('count'))
+            .join(Article, Source.id == Article.source_id)
+            .group_by(Source.name)
+            .order_by(Source.name)
+            .all())
