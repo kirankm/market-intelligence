@@ -396,3 +396,81 @@ def digest_summary_edit_form(digest_id, summary):
         id=f"digest-summary-{digest_id}",
         cls="mt-2 p-2 border rounded bg-white"
     )
+
+def exec_search_box(search=''):
+    """Render search box for executive keyword search."""
+    return Div(
+        Span("🔍 ", cls="text-sm"),
+        Input(type="text", name="search", value=search,
+              placeholder="Search articles...",
+              hx_get="/executive/search",
+              hx_target="#search-results",
+              hx_swap="outerHTML",
+              hx_trigger="keyup changed delay:300ms",
+              hx_include="this",
+              cls="text-sm border rounded px-2 py-1 w-64"),
+        cls="flex items-center gap-1 mb-4"
+    )
+
+def exec_search_results(articles, search, article_tags_fn, min_for_summary=5):
+    """Render search results with optional summarize button."""
+    count = len(articles)
+    parts = []
+    if count > 0:
+        parts.append(P(f"Found {count} articles", cls="text-sm text-gray-500 mb-2"))
+    if count >= min_for_summary:
+        parts.append(Button(f"📝 Summarize these {count} results",
+                            cls="text-xs px-3 py-1 bg-blue-500 text-white rounded mb-3",
+                            hx_post=f"/executive/search/summarize?search={search}",
+                            hx_target="#search-summaries-list",
+                            hx_swap="outerHTML"))
+    cards = [Div(
+        Strong(a.title, cls="text-sm"),
+        Span(f" — {a.source.name}", cls="text-xs text-gray-500"),
+        Span(f" • {a.date}", cls="text-xs text-gray-400"),
+        cls="py-1"
+    ) for a in articles]
+    parts.extend(cards)
+    return Div(*parts) if parts else P("Type to search", cls="text-sm text-gray-400 italic")
+
+def keyword_summary_item(ks):
+    """Render a single saved keyword summary."""
+    if ks.status == 'pending':
+        return Div(
+            Span(f"🔍 \"{ks.query}\" — ⏳ Generating...", cls="text-sm text-gray-500"),
+            hx_get=f"/executive/search/summaries",
+            hx_trigger="every 3s",
+            hx_target="#search-summaries-list",
+            hx_swap="outerHTML",
+            cls="py-2 border-b"
+        )
+    return Div(
+        Div(
+            Span(f"🔍 \"{ks.query}\"", cls="text-sm font-medium"),
+            Span(f" — {ks.article_count} articles", cls="text-xs text-gray-500"),
+            Span(f" — {ks.created_at.strftime('%b %d, %H:%M')}", cls="text-xs text-gray-400"),
+            cls="mb-1"
+        ),
+        P(ks.summary, cls="text-sm text-gray-700 leading-relaxed"),
+        cls="py-2 border-b"
+    )
+
+
+def keyword_summaries_list(summaries):
+    """Render persistent list of generated summaries."""
+    has_pending = any(ks.status == 'pending' for ks in summaries)
+    items = [keyword_summary_item(ks) for ks in summaries]
+    if not items:
+        items = [P("No summaries generated yet", cls="text-sm text-gray-400 italic")]
+    attrs = {}
+    if has_pending:
+        attrs = dict(hx_get="/executive/search/summaries",
+                     hx_trigger="every 3s",
+                     hx_swap="outerHTML")
+    return Div(
+        H4("Your Summaries", cls="text-sm font-bold mb-2"),
+        *items,
+        id="search-summaries-list",
+        cls="mt-4",
+        **attrs
+    )

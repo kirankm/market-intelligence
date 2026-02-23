@@ -8,7 +8,8 @@ from newsfeed.web.components.cards import (
     collapsible_section, article_card, tag_filter, source_filter,
     date_filter, category_period_dropdown, category_card,
     digest_ribbon, digest_item, digest_expanded,
-    digest_summary_display, digest_summary_edit_form
+    digest_summary_display, digest_summary_edit_form,
+    exec_search_box, exec_search_results, keyword_summaries_list
 )
 from newsfeed.web.queries.feed import (
     get_starred_articles, get_tags_with_counts, get_sources_with_counts,
@@ -17,11 +18,12 @@ from newsfeed.web.queries.feed import (
     get_category_article_counts, get_category_star_counts,
     get_available_summary_periods, get_digests,
     publish_digest, unpublish_digest, get_latest_digest_summary,
-    get_original_digest_summary, create_digest_summary_version
+    get_original_digest_summary, create_digest_summary_version,
+    search_articles, create_keyword_summary, get_keyword_summary,
+    get_recent_keyword_summaries
 )
 
 ar = APIRouter()
-
 
 def starred_filters(db, state):
     """Render filters for starred section."""
@@ -74,9 +76,18 @@ def section_category_summaries(db, period_from=None, period_to=None):
         id="categories-content"
     )
 
-def section_keyword_search():
-    """Placeholder for keyword search."""
-    return P("Keyword search will appear here", cls="text-sm text-gray-400 italic")
+def section_keyword_search(db, search='', user_id=None):
+    """Keyword search section with summarize option and saved summaries."""
+    min_for_summary = int(get_setting(db, 'min_articles_for_summary', '5'))
+    articles = search_articles(db, search) if search else []
+    summaries = get_recent_keyword_summaries(db, user_id)
+    return Div(
+        exec_search_box(search),
+        Div(exec_search_results(articles, search, article_tags, min_for_summary),
+            id="search-results"),
+        keyword_summaries_list(summaries),
+        id="search-content"
+    )
 
 def section_starred(db, user_id):
     """Starred by team section with filters."""
@@ -105,7 +116,7 @@ def executive_page(session, db):
         Div(
             collapsible_section("Category Summaries", section_category_summaries(db),
                                 "categories", open=True),
-            collapsible_section("Keyword Search", section_keyword_search(),
+            collapsible_section("Keyword Search", section_keyword_search(db, user_id=user_id),
                                 "search", open=False),
             collapsible_section("Starred by Team", section_starred(db, user_id),
                                 "starred", open=False),
@@ -126,7 +137,7 @@ def get(section_id: str, session, request, open: str = '1'):
     is_open = open == '1'
     sections = {
         'categories': ("Category Summaries", section_category_summaries(db)),
-        'search':     ("Keyword Search", section_keyword_search()),
+        'search':     ("Keyword Search", section_keyword_search(db, user_id=user_id)),
         'starred':    ("Starred by Team", section_starred(db, user_id)),
         'digests':    ("Recent Digests", section_digests(db)),
     }
@@ -220,3 +231,18 @@ def get(digest_id: int, session, request):
     db = request.state.db
     summary = get_latest_digest_summary(db, digest_id)
     return digest_summary_display(digest_id, summary, show_edit=True)
+
+@ar('/executive/search')
+def get(session, request, search: str = ''):
+    db = request.state.db
+    min_for_summary = int(get_setting(db, 'min_articles_for_summary', '5'))
+    articles = search_articles(db, search) if search else []
+    return Div(exec_search_results(articles, search, article_tags, min_for_summary),
+               id="search-results")
+
+@ar('/executive/search/summaries')
+def get(session, request):
+    db = request.state.db
+    user_id = session.get('user_id')
+    summaries = get_recent_keyword_summaries(db, user_id)
+    return keyword_summaries_list(summaries)

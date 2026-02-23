@@ -6,7 +6,7 @@ from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSum
 from newsfeed.storage.models import AppSetting, Source
 from newsfeed.storage.models import ArticleSummary, CategorySummary
 from datetime import datetime
-from newsfeed.storage.models import Digest, DigestItem, DigestSummary
+from newsfeed.storage.models import Digest, DigestItem, DigestSummary, KeywordSummary
 
 
 def get_setting(db, key, default='5'):
@@ -259,3 +259,30 @@ def create_digest_summary_version(db, digest_id, content, user_id=None):
     db.add(summary)
     db.commit()
     return summary
+
+def create_keyword_summary(db, query, article_count, user_id=None):
+    """Create a pending keyword summary request."""
+    ks = KeywordSummary(
+        query=query,
+        article_count=article_count,
+        status='pending',
+        requested_by=user_id
+    )
+    db.add(ks)
+    db.commit()
+    return ks
+
+
+def get_keyword_summary(db, summary_id):
+    """Fetch a keyword summary by id."""
+    return db.query(KeywordSummary).filter(KeywordSummary.id == summary_id).first()
+
+def get_recent_keyword_summaries(db, user_id=None, limit=10):
+    """Fetch recent completed keyword summaries."""
+    q = (db.query(KeywordSummary)
+         .filter(KeywordSummary.status.in_(['complete', 'pending'])))
+    if user_id:
+        q = q.filter(KeywordSummary.requested_by == user_id)
+    q = q.order_by(desc(KeywordSummary.created_at)).limit(limit)
+    return q.all()
+
