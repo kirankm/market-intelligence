@@ -1,4 +1,6 @@
+"""Shared navigation bar."""
 from fasthtml.common import *
+from monsterui.all import DivFullySpaced, DivHStacked, TextPresets
 
 NAV_BY_ROLE = {
     'contributor': [('Feed', '/feed')],
@@ -12,7 +14,8 @@ def nav_links(role, current_path):
     """Build nav links, highlighting the current page."""
     links = NAV_BY_ROLE.get(role, [])
     return [A(label, href=path,
-              cls="font-bold" if path == current_path else "")
+              cls="font-semibold text-foreground" if path == current_path
+              else TextPresets.muted_sm + " hover:text-foreground transition")
             for label, path in links]
 
 
@@ -21,8 +24,15 @@ def navbar(session, current_path):
     role = session.get('role', '')
     name = session.get('user_name', '')
     return Nav(
-        Div(Strong("MI News Feed"), cls="flex-none"),
-        Div(*nav_links(role, current_path), cls="flex gap-4"),
-        Div(Span(name, cls="mr-2"), A("Logout", href="/logout")),
-        cls="flex items-center justify-between p-4 border-b"
+        DivFullySpaced(
+            Strong("MI News Feed", cls="text-foreground"),
+            DivHStacked(*nav_links(role, current_path), cls="gap-6"),
+            DivHStacked(
+                P(name, cls=TextPresets.muted_sm),
+                A("Logout", href="/logout", cls=TextPresets.muted_sm + " hover:text-foreground transition"),
+                cls="gap-3"
+            ),
+        ),
+        cls="border-b border-border p-4 bg-background sticky top-0 z-10"
     )
+

@@ -1,6 +1,7 @@
 """Login and logout routes."""
 from fasthtml.common import *
 from fasthtml.core import APIRouter
+from monsterui.all import Card, ButtonT, DivCentered
 from newsfeed.storage.models import User, Role, UserRole
 
 ar = APIRouter()
@@ -26,16 +27,26 @@ def landing_for_role(role_name):
 
 
 def login_form(error=None):
-    """Render login page with optional error."""
-    return Titled("Market Intelligence Feed",
-        Form(
-            Label("Email", _for="email"),
-            Input(id="email", type="email", name="email",
-                  placeholder="Enter your email", required=True),
-            Button("Sign In", type="submit"),
-            P(error, style="color:red") if error else None,
-            method="post", action="/login"
-        ))
+    """Render login page."""
+    return Div(
+        DivCentered(
+            Card(
+                H2("Market Intelligence Feed", cls="text-xl font-semibold text-foreground mb-4"),
+                Form(
+                    Label("Email", cls="text-sm font-medium text-foreground"),
+                    Input(id="email", type="email", name="email",
+                          placeholder="Enter your email", required=True,
+                          cls="w-full text-sm border border-input rounded px-2.5 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring transition mb-3"),
+                    Button("Sign In", type="submit", cls=ButtonT.primary + " w-full"),
+                    P(error, cls="text-sm text-destructive mt-2") if error else None,
+                    method="post", action="/login",
+                    cls="space-y-2"
+                ),
+                cls="w-full max-w-sm"
+            ),
+            cls="min-h-screen bg-background"
+        ),
+    )
 
 
 @ar('/login')
@@ -60,3 +71,4 @@ def post(email: str, session, request):
 def logout(session):
     session.clear()
     return Redirect('/login')
+

@@ -6,7 +6,8 @@ import google.generativeai as genai
 from datetime import datetime
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import KeywordSummary, Article, ArticleSummary
-from sqlalchemy import desc
+from sqlalchemy import desc, cast, String
+from newsfeed.web.queries.feed import search_articles
 
 log = logging.getLogger("newsfeed.keyword_summarizer")
 
@@ -26,18 +27,17 @@ def get_pending_summaries(db):
             .order_by(KeywordSummary.created_at)
             .all())
 
-
 def get_matching_articles(db, query, limit=50):
     """Fetch articles matching the search query."""
     term = f"%{query}%"
     return (db.query(Article)
             .outerjoin(ArticleSummary)
             .filter(Article.title.ilike(term) |
-                    ArticleSummary.subtitle.ilike(term))
+                    ArticleSummary.subtitle.ilike(term) |
+                    cast(ArticleSummary.bullets, String).ilike(term))
             .order_by(desc(Article.date))
             .limit(limit)
             .all())
-
 
 def format_articles(articles):
     """Format articles for the LLM prompt."""
@@ -63,7 +63,9 @@ def generate_summary(query, articles):
 def process_one(db, ks):
     """Process a single pending keyword summary."""
     try:
-        articles = get_matching_articles(db, ks.query)
+        log.info(f"Searching for: '{ks.query}'")
+        articles = search_articles(db, ks.query)
+        log.info(f"Found {len(articles)} articles for '{ks.query}'")
         if not articles:
             ks.status = 'failed'
             ks.summary = 'No matching articles found'

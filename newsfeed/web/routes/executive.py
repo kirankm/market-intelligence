@@ -25,6 +25,12 @@ from newsfeed.web.queries.feed import (
 
 ar = APIRouter()
 
+PAGE = "max-w-5xl mx-auto bg-background"
+PAGE_PADDING = "px-6 py-4"
+FILTER_BAR = "mb-4 flex flex-col gap-3"
+TEXT_EMPTY = "text-sm text-muted-foreground italic"
+TEXT_ERROR = "text-sm text-destructive"
+
 def starred_filters(db, state):
     """Render filters for starred section."""
     tags = get_starred_tags_with_counts(db)
@@ -32,9 +38,9 @@ def starred_filters(db, state):
     top_n = int(get_setting(db, 'top_tags_count', '5'))
     return Div(
         tag_filter(tags, state, top_n),
-        source_filter(sources, state),
-        date_filter(state),
-        cls="mb-4 flex flex-col gap-2"
+        Div(source_filter(sources, state), date_filter(state),
+            cls="flex items-center gap-6"),
+        cls=FILTER_BAR
     )
 
 
@@ -45,7 +51,7 @@ def starred_list(db, user_id, state):
                                      date_from=d_from, date_to=d_to)
     cards = [article_card(a, article_tags(a), is_starred(a, user_id))
              for a in articles]
-    if not cards: return P("No starred articles", cls="text-sm text-gray-400 italic")
+    if not cards: return P("No starred articles", cls=TEXT_EMPTY)
     return Div(*cards)
 
 
@@ -58,12 +64,12 @@ def starred_content(db, user_id, state):
 def section_category_summaries(db, period_from=None, period_to=None):
     """Category summaries section content."""
     periods = get_available_summary_periods(db)
-    if not periods: return P("No summaries available", cls="text-sm text-gray-400 italic")
+    if not periods: return P("No summaries available", cls=TEXT_EMPTY)
     if not period_from:
         period_from, period_to = periods[0]
     tag_names_str = get_setting(db, 'summary_categories', '')
     tag_names = [t.strip() for t in tag_names_str.split(',') if t.strip()]
-    if not tag_names: return P("No categories configured", cls="text-sm text-gray-400 italic")
+    if not tag_names: return P("No categories configured", cls=TEXT_EMPTY)
     summaries = get_category_summaries(db, tag_names, period_from, period_to)
     article_counts = dict(get_category_article_counts(db, tag_names, period_from, period_to))
     star_counts = dict(get_category_star_counts(db, tag_names, period_from, period_to))
@@ -72,7 +78,7 @@ def section_category_summaries(db, period_from=None, period_to=None):
              for summary, name in summaries]
     return Div(
         category_period_dropdown(periods, period_from, period_to),
-        *cards if cards else [P("No summaries for this period", cls="text-sm text-gray-400 italic")],
+        *cards if cards else [P("No summaries for this period", cls=TEXT_EMPTY)],
         id="categories-content"
     )
 
@@ -102,7 +108,7 @@ def section_digests(db, active_tab='draft'):
     show_publish = active_tab == 'draft'
     digest_cards = [digest_item(d, count, show_publish) for d, count in items]
     if not digest_cards:
-        digest_cards = [P("No digests", cls="text-sm text-gray-400 italic")]
+        digest_cards = [P("No digests", cls=TEXT_EMPTY)]
     return Div(
         digest_ribbon(len(drafts), len(sent), active_tab),
         *digest_cards,
@@ -111,7 +117,7 @@ def section_digests(db, active_tab='draft'):
 
 def executive_page(session, db):
     user_id = session.get('user_id')
-    return Titled("Executive Dashboard",
+    return Div(
         navbar(session, '/executive'),
         Div(
             collapsible_section("Category Summaries", section_category_summaries(db),
@@ -122,8 +128,10 @@ def executive_page(session, db):
                                 "starred", open=False),
             collapsible_section("Recent Digests", section_digests(db),
                                 "digests", open=False),
-            cls="p-4"
-        ))
+            cls=PAGE_PADDING
+        ),
+        cls=PAGE
+    )
 
 @ar('/executive')
 def get(session, request):
@@ -221,7 +229,7 @@ def post(digest_id: int, session, request):
     db = request.state.db
     user_id = session.get('user_id')
     original = get_original_digest_summary(db, digest_id)
-    if not original: return P("No original found", cls="text-sm text-red-500")
+    if not original: return P("No original found", cls=TEXT_ERROR)
     summary = create_digest_summary_version(db, digest_id, original.content, user_id)
     return digest_summary_display(digest_id, summary, show_edit=True)
 
@@ -244,5 +252,14 @@ def get(session, request, search: str = ''):
 def get(session, request):
     db = request.state.db
     user_id = session.get('user_id')
+    summaries = get_recent_keyword_summaries(db, user_id)
+    return keyword_summaries_list(summaries)
+
+@ar('/executive/search/summarize')
+def post(session, request, search: str = ''):
+    db = request.state.db
+    user_id = session.get('user_id')
+    articles = search_articles(db, search) if search else []
+    create_keyword_summary(db, search, len(articles), user_id)
     summaries = get_recent_keyword_summaries(db, user_id)
     return keyword_summaries_list(summaries)

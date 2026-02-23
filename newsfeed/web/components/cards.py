@@ -1,10 +1,10 @@
 """Article card and filter components."""
 from fasthtml.common import *
+from monsterui.all import Card, ButtonT, DivHStacked, DivLAligned, Loading
 from urllib.parse import urlencode
 from newsfeed.web.filters import FilterState
 import json
 import re as re_module
-from fasthtml.common import *
 
 # ── URL Helper ──────────────────────────────────────────────
 
@@ -24,25 +24,37 @@ def build_tags_param(active_tags, toggle_tag):
     else: tags.add(toggle_tag)
     return ','.join(sorted(tags))
 
+# ── Shared Pill Styles ──────────────────────────────────────
+
+PILL = "text-xs px-2 py-0.5 rounded-full cursor-pointer transition"
+PILL_ACTIVE = f"{PILL} bg-primary text-primary-foreground font-semibold"
+PILL_INACTIVE = f"{PILL} bg-muted text-muted-foreground hover:bg-accent"
+PILL_CLEAR = f"{PILL} bg-destructive/10 text-destructive hover:bg-destructive/20"
+PILL_MORE = f"{PILL} bg-muted text-muted-foreground hover:bg-accent"
+BTN_SUCCESS = "text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
+BTN_WARNING = "text-xs px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition"
+BTN_PRIMARY = "text-xs px-3 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
+EXEC_INPUT = "text-sm border border-input rounded px-2.5 py-1.5 bg-background text-foreground w-full focus:outline-none focus:ring-1 focus:ring-ring transition"
+
 
 # ── Card Components ─────────────────────────────────────────
 
 def tag_pill(name):
     """Render a single tag pill."""
-    return Span(name, cls="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full")
+    return Span(name, cls="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full")
 
 
 def card_meta(article, source_name, tags):
     """Render date, source, and tags row."""
     date_str = article.date.strftime("%d %b %Y") if article.date else "No date"
     pills = [tag_pill(t) for t in tags]
-    return Div(
-        Span(date_str, cls="text-sm text-gray-500"),
-        Span(" • ", cls="text-sm text-gray-400"),
-        Span(source_name, cls="text-sm text-gray-500"),
-        Span(" • ", cls="text-sm text-gray-400") if pills else None,
+    return DivLAligned(
+        Span(date_str, cls="text-xs text-muted-foreground"),
+        Span("•", cls="text-xs text-muted-foreground"),
+        Span(source_name, cls="text-xs text-muted-foreground"),
+        Span("•", cls="text-xs text-muted-foreground") if pills else None,
         *pills,
-        cls="flex items-center gap-1 flex-wrap"
+        cls="gap-1.5 flex-wrap mt-0.5"
     )
 
 
@@ -50,31 +62,33 @@ def star_icon(starred, article_id):
     """Render star icon with HTMX toggle."""
     return Span(
         "⭐" if starred else "☆",
-        cls="text-lg cursor-pointer",
+        cls="text-lg cursor-pointer hover:scale-110 transition",
         hx_post=f"/feed/article/{article_id}/star",
         hx_swap="outerHTML"
     )
 
+
 def summary_section(summary, search=''):
     """Render subtitle and bullets from summary."""
-    if not summary: return P("No summary available", cls="text-sm text-gray-400 italic")
+    if not summary: return P("No summary available", cls="text-sm text-muted-foreground italic")
     bullets = summary.bullets or []
     subtitle = highlight(summary.subtitle, search) if search else summary.subtitle
     return Div(
         P(subtitle, cls="text-sm font-medium mt-2") if summary.subtitle else None,
-        Ul(*[Li(highlight(b, search) if search else b, cls="text-sm text-gray-600")
+        Ul(*[Li(highlight(b, search) if search else b, cls="text-sm text-muted-foreground")
              for b in bullets], cls="list-disc ml-5 mt-1"),
     )
+
 
 def article_card(article, tags, starred, search=''):
     """Render a collapsed article card."""
     source_name = article.source.name if article.source else "Unknown"
     title = highlight(article.title, search) if search else article.title
     return Div(
-        Div(
+        DivHStacked(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(title, cls="cursor-pointer"),
+                Div(Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition"),
                     hx_get=f"/feed/article/{article.id}/expand?search={search}",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML",
@@ -82,33 +96,34 @@ def article_card(article, tags, starred, search=''):
                 card_meta(article, source_name, tags),
                 cls="flex-1"
             ),
-            cls="flex gap-3 items-start"
+            cls="gap-3 items-start"
         ),
-        cls="p-3 border-b hover:bg-gray-50",
+        cls="py-3 px-4 border-b border-border hover:bg-muted/50 transition",
         id=f"article-{article.id}"
     )
+
 
 def expanded_card(article, tags, starred, summary, search=''):
     """Render an expanded article card with summary."""
     source_name = article.source.name if article.source else "Unknown"
     title = highlight(article.title, search) if search else article.title
     return Div(
-        Div(
+        DivHStacked(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(title, cls="cursor-pointer"),
+                Div(Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition"),
                     hx_get=f"/feed/article/{article.id}/collapse",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML"),
                 card_meta(article, source_name, tags),
                 summary_section(summary, search),
                 A("🔗 Read original", href=article.url, target="_blank",
-                  cls="text-sm text-blue-600 mt-2 inline-block"),
+                  cls="text-sm text-primary hover:text-primary/80 mt-2 inline-block transition"),
                 cls="flex-1"
             ),
-            cls="flex gap-3 items-start"
+            cls="gap-3 items-start"
         ),
-        cls="p-3 border-b bg-gray-50 expanded",
+        cls="py-3 px-4 border-b border-border bg-muted/50 expanded",
         id=f"article-{article.id}"
     )
 
@@ -118,33 +133,29 @@ def tag_pill_filter(name, count, state):
     """Render a single filter tag pill."""
     is_active = name in state.tags
     new_tags = build_tags_param(state.tags, name)
-    cls = ("bg-blue-600 text-white font-bold" if is_active
-           else "bg-gray-100 text-gray-600 hover:bg-gray-200")
     return Span(f"{name} ({count})",
-                cls=f"text-xs px-2 py-1 rounded-full cursor-pointer {cls}",
+                cls=PILL_ACTIVE if is_active else PILL_INACTIVE,
                 hx_get=build_filter_url(state, tags=new_tags),
                 hx_target=f"#{state.target}", hx_swap="outerHTML")
 
+
 def clear_pill(state):
     """Render clear filter pill."""
-    return Span("✕ Clear",
-                cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-red-100 text-red-600",
+    return Span("✕ Clear", cls=PILL_CLEAR,
                 hx_get=build_filter_url(state, tags=''),
                 hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def more_pill(count, state):
     """Render + N more pill."""
-    return Span(f"+ {count} more",
-                cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-gray-200 text-gray-500",
+    return Span(f"+ {count} more", cls=PILL_MORE,
                 hx_get=build_filter_url(state, expanded='1'),
                 hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def less_pill(state):
     """Render - less pill."""
-    return Span("- less",
-                cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-gray-200 text-gray-500",
+    return Span("- less", cls=PILL_MORE,
                 hx_get=build_filter_url(state, expanded='0'),
                 hx_target=f"#{state.target}", hx_swap="outerHTML")
 
@@ -157,8 +168,10 @@ def tag_filter(tags_with_counts, state, top_n=5):
     if state.tags: pills.append(clear_pill(state))
     if not state.expanded and rest_count > 0: pills.append(more_pill(rest_count, state))
     if state.expanded and rest_count > 0: pills.append(less_pill(state))
-    return Div(Span("Tags: ", cls="text-sm font-medium"), *pills,
-               cls="flex gap-2 flex-wrap items-center")
+    return DivLAligned(
+        Span("Tags:", cls="text-sm font-medium text-foreground"), *pills,
+        cls="gap-2 flex-wrap"
+    )
 
 
 def source_filter(sources_with_counts, state):
@@ -167,23 +180,22 @@ def source_filter(sources_with_counts, state):
     for name, count in sources_with_counts:
         options.append(Option(f"{name} ({count})", value=name, selected=name == state.source))
     other_params = {k: v for k, v in state.to_params().items() if k != 'source' and v}
-    return Div(
-        Span("Source: ", cls="text-sm font-medium"),
+    return DivLAligned(
+        Span("Source:", cls="text-sm font-medium text-foreground"),
         Select(*options, name="source",
                hx_get=state.base, hx_target=f"#{state.target}", hx_swap="outerHTML",
                hx_include="this", hx_vals=json.dumps(other_params),
-               cls="text-sm border rounded px-2 py-1"),
-        cls="flex items-center gap-2"
+               cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground"),
+        cls="gap-2"
     )
+
 
 def date_button(label, period, state):
     """Render a single date filter button."""
     is_active = state.date == period
     new_date = '' if is_active else period
-    cls = ("bg-blue-600 text-white font-bold" if is_active
-           else "bg-gray-100 text-gray-600 hover:bg-gray-200")
     return Span(label,
-                cls=f"text-xs px-2 py-1 rounded-full cursor-pointer {cls}",
+                cls=PILL_ACTIVE if is_active else PILL_INACTIVE,
                 hx_get=build_filter_url(state, date=new_date),
                 hx_target=f"#{state.target}", hx_swap="outerHTML")
 
@@ -191,31 +203,35 @@ def date_button(label, period, state):
 def date_filter(state):
     """Render date filter buttons."""
     buttons = [('Today', 'today'), ('This Week', 'week'), ('This Month', 'month')]
-    return Div(
-        Span("Date: ", cls="text-sm font-medium"),
+    return DivLAligned(
+        Span("Date:", cls="text-sm font-medium text-foreground"),
         *[date_button(label, period, state) for label, period in buttons],
-        cls="flex items-center gap-2"
+        cls="gap-2"
     )
+
 
 def search_box(state, debounce=300):
     """Render search input with debounced HTMX."""
-    return Div(
-        Span("🔍 ", cls="text-sm"),
+    return DivLAligned(
+        Span("🔍", cls="text-sm"),
         Input(type="text", name="search", value=state.search,
               placeholder="Search title/summary...",
               hx_get=build_filter_url(state, search=''),
-              hx_target=f"#{state.target}", hx_swap="outerHTML",
+              hx_target=f"#{state.target}",
+              hx_swap="outerHTML",
               hx_trigger=f"keyup changed delay:{debounce}ms",
               hx_include="this",
-              cls="text-sm border rounded px-2 py-1 w-64"),
-        cls="flex items-center gap-1"
+              cls=EXEC_INPUT),
+        cls="gap-2"
     )
+
 
 def highlight(text, term):
     """Wrap matching term in <mark> tags, case-insensitive."""
     if not term or not text: return text
     parts = re_module.split(f'({re_module.escape(term)})', text, flags=re_module.IGNORECASE)
     return Span(*[Mark(p) if p.lower() == term.lower() else p for p in parts])
+
 
 def load_more_sentinel(state, offset, page_size):
     """Hidden div that triggers next page load when scrolled into view."""
@@ -224,26 +240,27 @@ def load_more_sentinel(state, offset, page_size):
     params['page_size'] = str(page_size)
     cleaned = {k: v for k, v in params.items() if v}
     url = f"{state.base}/more?{urlencode(cleaned)}"
-    return Div(hx_get=url,
-               hx_trigger="revealed",
-               hx_swap="outerHTML",
-               cls="h-1")
+    return Div(hx_get=url, hx_trigger="revealed", hx_swap="outerHTML", cls="h-1")
+
+# ── Collapsible Sections ────────────────────────────────────
 
 def collapsible_section(title, content, section_id, open=False):
     """Render a collapsible section with toggle."""
     icon = "▼" if open else "►"
     return Div(
         Div(
-            Span(f"{icon} {title}", cls="text-lg font-bold cursor-pointer"),
+            Span(f"{icon} {title}", cls="text-base font-semibold text-foreground cursor-pointer"),
             hx_get=f"/executive/section/{section_id}?open={'0' if open else '1'}",
             hx_target=f"#section-{section_id}",
             hx_swap="outerHTML",
-            cls="p-3 border-b hover:bg-gray-50"
+            cls="px-4 py-3 bg-muted/50 hover:bg-muted transition"
         ),
-        Div(content, cls="p-3") if open else None,
+        Div(content, cls="px-4 py-3") if open else None,
         id=f"section-{section_id}",
-        cls="border rounded mb-4"
+        cls="border border-border rounded-lg overflow-hidden mb-4"
     )
+
+# ── Category Summaries ──────────────────────────────────────
 
 def period_label(date_from, date_to):
     """Format date range as readable label."""
@@ -257,37 +274,39 @@ def category_period_dropdown(periods, active_from=None, active_to=None):
         label = period_label(df, dt)
         selected = (df == active_from and dt == active_to)
         options.append(Option(label, value=f"{df}|{dt}", selected=selected))
-    return Div(
-        Span("Period: ", cls="text-sm font-medium"),
+    return DivLAligned(
+        Span("Period:", cls="text-sm font-medium text-foreground"),
         Select(*options, name="period",
                hx_get="/executive/categories",
                hx_target="#categories-content",
                hx_swap="outerHTML",
                hx_include="this",
-               cls="text-sm border rounded px-2 py-1"),
-        cls="flex items-center gap-2 mb-4"
+               cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground"),
+        cls="gap-2 mb-4"
     )
+
 
 def category_card(tag_name, summary_text, article_count, star_count):
     """Render a single category summary card."""
-    return Div(
+    return Card(
         Div(
-            Strong(tag_name),
+            Strong(tag_name, cls="text-foreground"),
             Span(f"  ({article_count} articles, {star_count} ⭐)",
-                 cls="text-sm text-gray-500"),
+                 cls="text-xs text-muted-foreground"),
             cls="mb-2"
         ),
-        P(summary_text, cls="text-sm text-gray-700 leading-relaxed"),
-        cls="p-4 border rounded mb-3"
+        P(summary_text, cls="text-sm text-muted-foreground leading-relaxed"),
+        cls="mb-3"
     )
+
+# ── Digests ─────────────────────────────────────────────────
 
 def digest_tab(label, count, tab, active_tab):
     """Render a single digest ribbon tab."""
     is_active = tab == active_tab
-    cls = ("bg-blue-600 text-white font-bold" if is_active
-           else "bg-gray-100 text-gray-600 hover:bg-gray-200")
     return Span(f"{label} ({count})",
-                cls=f"text-sm px-3 py-1 rounded-full cursor-pointer {cls}",
+                cls=f"text-sm px-3 py-1 rounded-full cursor-pointer transition "
+                    f"{'bg-primary text-primary-foreground font-semibold' if is_active else 'bg-muted text-muted-foreground hover:bg-accent'}",
                 hx_get=f"/executive/digests?tab={tab}",
                 hx_target="#digests-content",
                 hx_swap="outerHTML")
@@ -295,112 +314,110 @@ def digest_tab(label, count, tab, active_tab):
 
 def digest_ribbon(draft_count, sent_count, active_tab='draft'):
     """Render digest tab ribbon."""
-    return Div(
+    return DivLAligned(
         digest_tab("To be Published", draft_count, "draft", active_tab),
         digest_tab("Published", sent_count, "sent", active_tab),
-        cls="flex gap-2 mb-4"
+        cls="gap-2 mb-4"
     )
 
+def _digest_action_btn(digest_id, show_publish):
+    """Render publish or review button for a digest."""
+    if show_publish:
+        return Button("Publish", cls=f"ml-4 {BTN_SUCCESS}",
+                      hx_post=f"/executive/digests/{digest_id}/publish",
+                      hx_target="#digests-content", hx_swap="outerHTML")
+    return Button("Review", cls=f"ml-4 {BTN_WARNING}",
+                  hx_post=f"/executive/digests/{digest_id}/review",
+                  hx_target="#digests-content", hx_swap="outerHTML")
 
 def digest_item(digest, item_count, show_publish=False):
     """Render a single digest list item."""
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
-        Div(
-            Span(f"📋 ", cls="text-lg"),
-            Strong(title, cls="cursor-pointer",
+        DivLAligned(
+            Span("📋", cls="text-base"),
+            Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition",
                    hx_get=f"/executive/digests/{digest.id}/expand?tab={'draft' if show_publish else 'sent'}",
                    hx_target=f"#digest-{digest.id}",
                    hx_swap="outerHTML"),
-            Span(f"  ({item_count} articles)", cls="text-sm text-gray-500"),
-            Button("Publish", cls="ml-4 text-xs px-2 py-1 bg-green-500 text-white rounded",
-                   hx_post=f"/executive/digests/{digest.id}/publish",
-                   hx_target="#digests-content",
-                   hx_swap="outerHTML") if show_publish else
-            Button("Review", cls="ml-4 text-xs px-2 py-1 bg-yellow-500 text-white rounded",
-                   hx_post=f"/executive/digests/{digest.id}/review",
-                   hx_target="#digests-content",
-                   hx_swap="outerHTML"),
-            cls="flex items-center"
+            Span(f"({item_count} articles)", cls="text-xs text-muted-foreground"),
+            _digest_action_btn(digest.id, show_publish),
+            cls="gap-2"
         ),
         id=f"digest-{digest.id}",
-        cls="p-3 border-b hover:bg-gray-50"
+        cls="py-3 px-4 border-b border-border hover:bg-muted/50 transition"
     )
+
 
 def digest_expanded(digest, item_count, summary=None, show_publish=False):
     """Render expanded digest with summary."""
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
-        Div(
-            Span(f"📋 ", cls="text-lg"),
-            Strong(title, cls="cursor-pointer",
+        DivLAligned(
+            Span("📋", cls="text-base"),
+            Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition",
                    hx_get=f"/executive/digests/{digest.id}/collapse?tab={'draft' if show_publish else 'sent'}",
                    hx_target=f"#digest-{digest.id}",
                    hx_swap="outerHTML"),
-            Span(f"  ({item_count} articles)", cls="text-sm text-gray-500"),
-            Button("Publish", cls="ml-4 text-xs px-2 py-1 bg-green-500 text-white rounded",
-                   hx_post=f"/executive/digests/{digest.id}/publish",
-                   hx_target="#digests-content",
-                   hx_swap="outerHTML") if show_publish else
-            Button("Review", cls="ml-4 text-xs px-2 py-1 bg-yellow-500 text-white rounded",
-                   hx_post=f"/executive/digests/{digest.id}/review",
-                   hx_target="#digests-content",
-                   hx_swap="outerHTML"),
-            cls="flex items-center mb-2"
+            Span(f"({item_count} articles)", cls="text-xs text-muted-foreground"),
+            _digest_action_btn(digest.id, show_publish),
+            cls="gap-2 mb-2"
         ),
         digest_summary_display(digest.id, summary, show_edit=show_publish),
         id=f"digest-{digest.id}",
-        cls="p-3 border-b bg-gray-50"
+        cls="py-3 px-4 border-b border-border bg-muted/50"
     )
+
 
 def digest_summary_display(digest_id, summary, show_edit=False):
     """Render digest summary with edit/revert buttons."""
     content = summary.content if summary else "No summary available"
     actions = []
     if show_edit:
-        actions.append(Span("✏️ Edit", cls="text-xs text-blue-600 cursor-pointer",
+        actions.append(Span("✏️ Edit", cls="text-xs text-primary cursor-pointer hover:underline",
                             hx_get=f"/executive/digests/{digest_id}/edit",
                             hx_target=f"#digest-summary-{digest_id}",
                             hx_swap="outerHTML"))
         if summary and summary.version > 1:
-            actions.append(Span("↩ Revert to original", cls="text-xs text-yellow-600 cursor-pointer ml-2",
+            actions.append(Span("↩ Revert", cls="text-xs text-yellow-600 cursor-pointer hover:underline ml-2",
                                 hx_post=f"/executive/digests/{digest_id}/revert",
                                 hx_target=f"#digest-summary-{digest_id}",
                                 hx_swap="outerHTML"))
     return Div(
-        P(content, cls="text-sm text-gray-700 leading-relaxed whitespace-pre-line"),
-        Div(*actions, cls="mt-2") if actions else None,
+        P(content, cls="text-sm text-muted-foreground leading-relaxed whitespace-pre-line"),
+        DivLAligned(*actions, cls="gap-2 mt-2") if actions else None,
         id=f"digest-summary-{digest_id}",
         cls="mt-2"
     )
-
 
 def digest_summary_edit_form(digest_id, summary):
     """Render inline edit form for digest summary."""
     content = summary.content if summary else ''
     return Div(
         Textarea(content, name="content", rows=8,
-                 cls="w-full text-sm border rounded px-2 py-1 mb-2"),
-        Div(
-            Button("Save", cls="text-xs px-2 py-1 bg-green-500 text-white rounded mr-2",
+                 cls="w-full text-sm border border-input rounded px-2.5 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring transition mb-2"),
+        DivLAligned(
+            Button("Save", cls=BTN_SUCCESS,
                    hx_post=f"/executive/digests/{digest_id}/save",
                    hx_target=f"#digest-summary-{digest_id}",
                    hx_swap="outerHTML",
                    hx_include=f"#digest-summary-{digest_id}"),
-            Span("Cancel", cls="text-xs text-gray-500 cursor-pointer",
+            Span("Cancel", cls="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition",
                  hx_get=f"/executive/digests/{digest_id}/cancel",
                  hx_target=f"#digest-summary-{digest_id}",
                  hx_swap="outerHTML"),
-            cls="flex items-center"
+            cls="gap-3"
         ),
         id=f"digest-summary-{digest_id}",
-        cls="mt-2 p-2 border rounded bg-white"
+        cls="mt-2 p-3 border border-border rounded-lg bg-background"
     )
+
+# ── Executive Search ────────────────────────────────────────
 
 def exec_search_box(search=''):
     """Render search box for executive keyword search."""
-    return Div(
-        Span("🔍 ", cls="text-sm"),
+    return DivLAligned(
+        Span("🔍", cls="text-sm"),
         Input(type="text", name="search", value=search,
               placeholder="Search articles...",
               hx_get="/executive/search",
@@ -408,8 +425,8 @@ def exec_search_box(search=''):
               hx_swap="outerHTML",
               hx_trigger="keyup changed delay:300ms",
               hx_include="this",
-              cls="text-sm border rounded px-2 py-1 w-64"),
-        cls="flex items-center gap-1 mb-4"
+              cls=EXEC_INPUT),
+        cls="gap-2 mb-4"
     )
 
 def exec_search_results(articles, search, article_tags_fn, min_for_summary=5):
@@ -417,42 +434,47 @@ def exec_search_results(articles, search, article_tags_fn, min_for_summary=5):
     count = len(articles)
     parts = []
     if count > 0:
-        parts.append(P(f"Found {count} articles", cls="text-sm text-gray-500 mb-2"))
+        parts.append(P(f"Found {count} articles", cls="text-sm text-muted-foreground mb-2"))
     if count >= min_for_summary:
         parts.append(Button(f"📝 Summarize these {count} results",
-                            cls="text-xs px-3 py-1 bg-blue-500 text-white rounded mb-3",
+                            cls=f"{BTN_PRIMARY} mb-3",
                             hx_post=f"/executive/search/summarize?search={search}",
                             hx_target="#search-summaries-list",
                             hx_swap="outerHTML"))
     cards = [Div(
-        Strong(a.title, cls="text-sm"),
-        Span(f" — {a.source.name}", cls="text-xs text-gray-500"),
-        Span(f" • {a.date}", cls="text-xs text-gray-400"),
+        Strong(a.title, cls="text-sm text-foreground"),
+        Span(f" — {a.source.name}", cls="text-xs text-muted-foreground"),
+        Span(f" • {a.date}", cls="text-xs text-muted-foreground"),
         cls="py-1"
     ) for a in articles]
     parts.extend(cards)
-    return Div(*parts) if parts else P("Type to search", cls="text-sm text-gray-400 italic")
+    return Div(*parts) if parts else P("Type to search", cls="text-sm text-muted-foreground italic")
+
 
 def keyword_summary_item(ks):
     """Render a single saved keyword summary."""
     if ks.status == 'pending':
         return Div(
-            Span(f"🔍 \"{ks.query}\" — ⏳ Generating...", cls="text-sm text-gray-500"),
-            hx_get=f"/executive/search/summaries",
+            DivLAligned(
+                Span(f"🔍 \"{ks.query}\"", cls="text-sm text-muted-foreground"),
+                Loading(),
+                cls="gap-2"
+            ),
+            hx_get="/executive/search/summaries",
             hx_trigger="every 3s",
             hx_target="#search-summaries-list",
             hx_swap="outerHTML",
-            cls="py-2 border-b"
+            cls="py-2 border-b border-border"
         )
-    return Div(
+    return Card(
         Div(
-            Span(f"🔍 \"{ks.query}\"", cls="text-sm font-medium"),
-            Span(f" — {ks.article_count} articles", cls="text-xs text-gray-500"),
-            Span(f" — {ks.created_at.strftime('%b %d, %H:%M')}", cls="text-xs text-gray-400"),
+            Span(f"🔍 \"{ks.query}\"", cls="text-sm font-medium text-foreground"),
+            Span(f" — {ks.article_count} articles", cls="text-xs text-muted-foreground"),
+            Span(f" — {ks.created_at.strftime('%b %d, %H:%M')}", cls="text-xs text-muted-foreground"),
             cls="mb-1"
         ),
-        P(ks.summary, cls="text-sm text-gray-700 leading-relaxed"),
-        cls="py-2 border-b"
+        P(ks.summary, cls="text-sm text-muted-foreground leading-relaxed"),
+        cls="mb-2"
     )
 
 
@@ -461,16 +483,17 @@ def keyword_summaries_list(summaries):
     has_pending = any(ks.status == 'pending' for ks in summaries)
     items = [keyword_summary_item(ks) for ks in summaries]
     if not items:
-        items = [P("No summaries generated yet", cls="text-sm text-gray-400 italic")]
+        items = [P("No summaries generated yet", cls="text-sm text-muted-foreground italic")]
     attrs = {}
     if has_pending:
         attrs = dict(hx_get="/executive/search/summaries",
                      hx_trigger="every 3s",
                      hx_swap="outerHTML")
     return Div(
-        H4("Your Summaries", cls="text-sm font-bold mb-2"),
+        H4("Your Summaries", cls="text-sm font-semibold text-foreground mb-2"),
         *items,
         id="search-summaries-list",
         cls="mt-4",
         **attrs
     )
+

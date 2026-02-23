@@ -15,6 +15,10 @@ from newsfeed.web.filters import FilterState, date_range
 
 ar = APIRouter()
 
+PAGE = "max-w-5xl mx-auto bg-background"
+PAGE_PADDING = "px-6 py-4"
+FILTER_BAR = "mb-4 flex flex-col gap-3"
+
 COLLAPSE_SCRIPT = Script("""
 function collapseExpanded(el) {
     const exp = document.querySelector('.expanded');
@@ -51,9 +55,9 @@ def feed_filters(db, state):
     return Div(
         search_box(state, debounce),
         tag_filter(tags, state, top_n),
-        source_filter(sources, state),
-        date_filter(state),
-        cls="mb-4 flex flex-col gap-2"
+        Div(source_filter(sources, state), date_filter(state),
+            cls="flex items-center gap-6"),
+        cls=FILTER_BAR
     )
 
 def feed_content(db, user_id, state):
@@ -62,14 +66,15 @@ def feed_content(db, user_id, state):
                article_list(db, user_id, state),
                id="feed-content")
 
-
 def feed_page(session, db, state):
     """Render feed page shell."""
     user_id = session.get('user_id')
-    return Titled("Feed",
+    return Div(
         navbar(session, '/feed'),
         COLLAPSE_SCRIPT,
-        Div(feed_content(db, user_id, state), cls="p-4"))
+        Div(feed_content(db, user_id, state), cls=PAGE_PADDING),
+        cls=PAGE
+    )
 
 @ar('/feed')
 def get(session, request, tags: str = '', expanded: str = '0', source: str = '', date: str = '', search: str = ''):
