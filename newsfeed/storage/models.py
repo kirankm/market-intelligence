@@ -208,6 +208,7 @@ class Digest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     items: Mapped[list["DigestItem"]] = relationship(back_populates="digest")
+    summaries: Mapped[list["DigestSummary"]] = relationship(back_populates="digest")
 
     __table_args__ = (
         CheckConstraint("date_from <= date_to", name="ck_digests_dates"),
@@ -316,4 +317,22 @@ class KeywordSummary(Base):
         CheckConstraint("status IN ('pending', 'complete', 'failed')", name="ck_keyword_summaries_status"),
         Index("idx_keyword_summaries_status", "status", postgresql_where="status = 'pending'"),
         Index("idx_keyword_summaries_user", "requested_by"),
+    )
+
+class DigestSummary(Base):
+    __tablename__ = "digest_summaries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    digest_id: Mapped[int] = mapped_column(ForeignKey("digests.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    content: Mapped[Optional[str]] = mapped_column(Text)
+    is_auto: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    digest: Mapped["Digest"] = relationship(back_populates="summaries")
+
+    __table_args__ = (
+        UniqueConstraint("digest_id", "version", name="uq_digest_summaries_version"),
+        Index("idx_digest_summaries_digest", "digest_id"),
     )

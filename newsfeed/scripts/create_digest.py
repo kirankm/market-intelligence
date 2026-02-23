@@ -7,7 +7,7 @@ load_dotenv()
 
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import (
-    Article, ArticleStar, ArticleSummary, Digest, DigestItem
+    Article, ArticleStar, ArticleSummary, Digest, DigestItem, DigestSummary
 )
 from sqlalchemy import func
 
@@ -41,9 +41,7 @@ def build_title(date_from: date, date_to: date) -> str:
     return f"Weekly Digest: {date_from.strftime('%b %d')}–{date_to.strftime('%b %d, %Y')}"
 
 # ── Create Digest ──────────────────────────────────────────
-
 def create_digest(db, date_from: date, date_to: date) -> bool:
-    """Create a digest from starred articles in the date range."""
     if digest_exists(db, date_from, date_to):
         log.info(f"Digest already exists for {date_from} → {date_to}")
         return False
@@ -73,6 +71,61 @@ def create_digest(db, date_from: date, date_to: date) -> bool:
 
     db.commit()
     log.info(f"Created digest '{title}' with {len(articles)} articles")
+
+    # Auto-generate summary
+    generate_digest_summary(db, digest.id)
+    return True
+
+def collect_digest_articles(db, digest_id: int) -> list[Article]:
+    """Get all articles in a digest, ordered by sort_order."""
+    return (
+        db.query(Article)
+        .join(DigestItem, Article.id == DigestItem.article_id)
+        .filter(DigestItem.digest_id == digest_id)
+        .order_by(DigestItem.sort_order)
+        .all()
+    )
+
+def build_digest_content(articles: list[Article]) -> str:
+    """Build digest summary content from articles. For now, concatenation of titles."""
+    lines = []
+    for i, a in enumerate(articles, 1):
+        lines.append(f"{i}. {a.title} ({a.date})")
+    return "\n".join(lines)
+
+def get_latest_version(db, digest_id: int) -> int:
+    """Get the latest summary version for a digest."""
+    result = (
+        db.query(func.max(DigestSummary.version))
+        .filter(DigestSummary.digest_id == digest_id)
+        .scalar()
+    )
+    return result or 0
+
+def generate_digest_summary(db, digest_id: int) -> bool:
+    """Generate a summary for a digest and save as new version."""
+    digest = db.query(Digest).filter(Digest.id == digest_id).first()
+    if not digest:
+        log.warning(f"Digest {digest_id} not found")
+        return False
+
+    articles = collect_digest_articles(db, digest_id)
+    if not articles:
+        log.info(f"No articles in digest {digest_id}")
+        return False
+
+    content = build_digest_content(articles)
+    version = get_latest_version(db, digest_id) + 1
+
+    summary = DigestSummary(
+        digest_id=digest_id,
+        version=version,
+        content=content,
+        is_auto=True,
+    )
+    db.add(summary)
+    db.commit()
+    log.info(f"Created digest summary v{version} for '{digest.title}' ({len(articles)} articles)")
     return True
 
 # ── Main ────────────────────────────────────────────────────

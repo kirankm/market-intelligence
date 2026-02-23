@@ -327,10 +327,9 @@ def digest_item(digest, item_count, show_publish=False):
         cls="p-3 border-b hover:bg-gray-50"
     )
 
-def digest_expanded(digest, item_count, articles, article_tags_fn, show_publish=False, summaries=None):
-    """Render expanded digest with article list and editable summaries."""
+def digest_expanded(digest, item_count, summary=None, show_publish=False):
+    """Render expanded digest with summary."""
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
-    summaries = summaries or {}
     return Div(
         Div(
             Span(f"📋 ", cls="text-lg"),
@@ -349,64 +348,51 @@ def digest_expanded(digest, item_count, articles, article_tags_fn, show_publish=
                    hx_swap="outerHTML"),
             cls="flex items-center mb-2"
         ),
-        Div(*[Div(
-            Span(f"• {a.title}", cls="text-sm font-medium"),
-            Span(f" — {a.source.name}", cls="text-xs text-gray-500"),
-            digest_article_summary(a.id, summaries.get(a.id), show_edit=show_publish),
-            cls="py-2"
-        ) for a in articles], cls="ml-6 border-l pl-3"),
+        digest_summary_display(digest.id, summary, show_edit=show_publish),
         id=f"digest-{digest.id}",
         cls="p-3 border-b bg-gray-50"
     )
 
-def digest_article_summary(article_id, summary, show_edit=False):
-    """Render article summary in digest with optional edit/revert buttons."""
-    if not summary:
-        return Div(P("No summary", cls="text-sm text-gray-400 italic"),
-                   id=f"digest-summary-{article_id}")
-    bullets = summary.bullets or []
+def digest_summary_display(digest_id, summary, show_edit=False):
+    """Render digest summary with edit/revert buttons."""
+    content = summary.content if summary else "No summary available"
     actions = []
     if show_edit:
         actions.append(Span("✏️ Edit", cls="text-xs text-blue-600 cursor-pointer",
-                            hx_get=f"/executive/digests/article/{article_id}/edit",
-                            hx_target=f"#digest-summary-{article_id}",
+                            hx_get=f"/executive/digests/{digest_id}/edit",
+                            hx_target=f"#digest-summary-{digest_id}",
                             hx_swap="outerHTML"))
-        if summary.version > 1:
+        if summary and summary.version > 1:
             actions.append(Span("↩ Revert to original", cls="text-xs text-yellow-600 cursor-pointer ml-2",
-                                hx_post=f"/executive/digests/article/{article_id}/revert",
-                                hx_target=f"#digest-summary-{article_id}",
+                                hx_post=f"/executive/digests/{digest_id}/revert",
+                                hx_target=f"#digest-summary-{digest_id}",
                                 hx_swap="outerHTML"))
     return Div(
-        P(summary.subtitle, cls="text-sm font-medium") if summary.subtitle else None,
-        Ul(*[Li(b, cls="text-sm text-gray-600") for b in bullets], cls="list-disc ml-5 mt-1") if bullets else None,
-        Div(*actions, cls="mt-1") if actions else None,
-        id=f"digest-summary-{article_id}",
-        cls="mt-1"
+        P(content, cls="text-sm text-gray-700 leading-relaxed whitespace-pre-line"),
+        Div(*actions, cls="mt-2") if actions else None,
+        id=f"digest-summary-{digest_id}",
+        cls="mt-2"
     )
 
-def digest_article_edit_form(article_id, summary):
-    """Render inline edit form for article summary."""
-    subtitle = summary.subtitle or '' if summary else ''
-    bullets = '\n'.join(summary.bullets or []) if summary else ''
+
+def digest_summary_edit_form(digest_id, summary):
+    """Render inline edit form for digest summary."""
+    content = summary.content if summary else ''
     return Div(
-        Label("Subtitle", cls="text-xs font-medium"),
-        Input(type="text", name="subtitle", value=subtitle,
-              cls="w-full text-sm border rounded px-2 py-1 mb-2"),
-        Label("Bullets (one per line)", cls="text-xs font-medium"),
-        Textarea(bullets, name="bullets", rows=5,
+        Textarea(content, name="content", rows=8,
                  cls="w-full text-sm border rounded px-2 py-1 mb-2"),
         Div(
             Button("Save", cls="text-xs px-2 py-1 bg-green-500 text-white rounded mr-2",
-                   hx_post=f"/executive/digests/article/{article_id}/save",
-                   hx_target=f"#digest-summary-{article_id}",
+                   hx_post=f"/executive/digests/{digest_id}/save",
+                   hx_target=f"#digest-summary-{digest_id}",
                    hx_swap="outerHTML",
-                   hx_include="closest div"),
+                   hx_include=f"#digest-summary-{digest_id}"),
             Span("Cancel", cls="text-xs text-gray-500 cursor-pointer",
-                 hx_get=f"/executive/digests/article/{article_id}/cancel",
-                 hx_target=f"#digest-summary-{article_id}",
+                 hx_get=f"/executive/digests/{digest_id}/cancel",
+                 hx_target=f"#digest-summary-{digest_id}",
                  hx_swap="outerHTML"),
             cls="flex items-center"
         ),
-        id=f"digest-summary-{article_id}",
-        cls="mt-1 p-2 border rounded bg-white"
+        id=f"digest-summary-{digest_id}",
+        cls="mt-2 p-2 border rounded bg-white"
     )

@@ -3,20 +3,21 @@ from fasthtml.common import *
 from fasthtml.core import APIRouter
 from newsfeed.web.components.nav import navbar
 from newsfeed.web.filters import FilterState, date_range
+
 from newsfeed.web.components.cards import (
     collapsible_section, article_card, tag_filter, source_filter,
     date_filter, category_period_dropdown, category_card,
     digest_ribbon, digest_item, digest_expanded,
-    digest_article_summary, digest_article_edit_form
+    digest_summary_display, digest_summary_edit_form
 )
 from newsfeed.web.queries.feed import (
     get_starred_articles, get_tags_with_counts, get_sources_with_counts,
     get_setting, article_tags, is_starred, get_starred_tags_with_counts,
     get_starred_sources_with_counts, get_category_summaries,
     get_category_article_counts, get_category_star_counts,
-    get_available_summary_periods, get_digests, get_digest_articles,
-    publish_digest, unpublish_digest, get_latest_summary,
-    get_original_summary, create_summary_version
+    get_available_summary_periods, get_digests,
+    publish_digest, unpublish_digest, get_latest_digest_summary,
+    get_original_digest_summary, create_digest_summary_version
 )
 
 ar = APIRouter()
@@ -157,7 +158,6 @@ def get(session, request, tab: str = 'draft'):
     db = request.state.db
     return section_digests(db, tab)
 
-
 @ar('/executive/digests/{digest_id}/expand')
 def get(digest_id: int, session, request, tab: str = 'draft'):
     db = request.state.db
@@ -165,10 +165,8 @@ def get(digest_id: int, session, request, tab: str = 'draft'):
     digest_match = [(d, c) for d, c in digests if d.id == digest_id]
     if not digest_match: return P("Not found")
     digest, count = digest_match[0]
-    articles = get_digest_articles(db, digest_id)
-    summaries = {a.id: get_latest_summary(db, a.id) for a in articles}
-    return digest_expanded(digest, count, articles, article_tags,
-                           show_publish=(tab == 'draft'), summaries=summaries)
+    summary = get_latest_digest_summary(db, digest_id)
+    return digest_expanded(digest, count, summary, show_publish=(tab == 'draft'))
 
 @ar('/executive/digests/{digest_id}/collapse')
 def get(digest_id: int, session, request, tab: str = 'draft'):
@@ -192,36 +190,33 @@ def post(digest_id: int, session, request):
     unpublish_digest(db, digest_id)
     return section_digests(db, 'draft')
 
-@ar('/executive/digests/article/{article_id}/edit')
-def get(article_id: int, session, request):
+@ar('/executive/digests/{digest_id}/edit')
+def get(digest_id: int, session, request):
     db = request.state.db
-    summary = get_latest_summary(db, article_id)
-    return digest_article_edit_form(article_id, summary)
+    summary = get_latest_digest_summary(db, digest_id)
+    return digest_summary_edit_form(digest_id, summary)
 
 
-@ar('/executive/digests/article/{article_id}/save')
-def post(article_id: int, session, request, subtitle: str = '', bullets: str = ''):
-    db = request.state.db
-    user_id = session.get('user_id')
-    bullet_list = [b.strip() for b in bullets.split('\n') if b.strip()]
-    summary = create_summary_version(db, article_id, subtitle, bullet_list, user_id)
-    return digest_article_summary(article_id, summary, show_edit=True)
-
-
-@ar('/executive/digests/article/{article_id}/revert')
-def post(article_id: int, session, request):
+@ar('/executive/digests/{digest_id}/save')
+def post(digest_id: int, session, request, content: str = ''):
     db = request.state.db
     user_id = session.get('user_id')
-    original = get_original_summary(db, article_id)
+    summary = create_digest_summary_version(db, digest_id, content, user_id)
+    return digest_summary_display(digest_id, summary, show_edit=True)
+
+
+@ar('/executive/digests/{digest_id}/revert')
+def post(digest_id: int, session, request):
+    db = request.state.db
+    user_id = session.get('user_id')
+    original = get_original_digest_summary(db, digest_id)
     if not original: return P("No original found", cls="text-sm text-red-500")
-    summary = create_summary_version(db, article_id, original.subtitle,
-                                      original.bullets, user_id)
-    return digest_article_summary(article_id, summary, show_edit=True)
+    summary = create_digest_summary_version(db, digest_id, original.content, user_id)
+    return digest_summary_display(digest_id, summary, show_edit=True)
 
 
-@ar('/executive/digests/article/{article_id}/cancel')
-def get(article_id: int, session, request):
+@ar('/executive/digests/{digest_id}/cancel')
+def get(digest_id: int, session, request):
     db = request.state.db
-    summary = get_latest_summary(db, article_id)
-    return digest_article_summary(article_id, summary, show_edit=True)
-
+    summary = get_latest_digest_summary(db, digest_id)
+    return digest_summary_display(digest_id, summary, show_edit=True)

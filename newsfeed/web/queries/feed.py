@@ -6,7 +6,7 @@ from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSum
 from newsfeed.storage.models import AppSetting, Source
 from newsfeed.storage.models import ArticleSummary, CategorySummary
 from datetime import datetime
-from newsfeed.storage.models import Digest, DigestItem
+from newsfeed.storage.models import Digest, DigestItem, DigestSummary
 
 
 def get_setting(db, key, default='5'):
@@ -228,27 +228,34 @@ def unpublish_digest(db, digest_id):
     db.commit()
     return True
 
-def create_summary_version(db, article_id, subtitle, bullets, user_id=None):
-    """Create a new summary version for an article."""
-    max_ver = (db.query(sqla_func.max(ArticleSummary.version))
-               .filter(ArticleSummary.article_id == article_id)
+def get_latest_digest_summary(db, digest_id):
+    """Get latest summary version for a digest."""
+    return (db.query(DigestSummary)
+            .filter(DigestSummary.digest_id == digest_id)
+            .order_by(desc(DigestSummary.version))
+            .first())
+
+
+def get_original_digest_summary(db, digest_id):
+    """Get version 1 (original) digest summary."""
+    return (db.query(DigestSummary)
+            .filter(DigestSummary.digest_id == digest_id,
+                    DigestSummary.version == 1)
+            .first())
+
+
+def create_digest_summary_version(db, digest_id, content, user_id=None):
+    """Create a new summary version for a digest."""
+    max_ver = (db.query(sqla_func.max(DigestSummary.version))
+               .filter(DigestSummary.digest_id == digest_id)
                .scalar()) or 0
-    summary = ArticleSummary(
-        article_id=article_id,
+    summary = DigestSummary(
+        digest_id=digest_id,
         version=max_ver + 1,
-        subtitle=subtitle,
-        bullets=bullets,
+        content=content,
         is_auto=False,
         created_by=user_id
     )
     db.add(summary)
     db.commit()
     return summary
-
-
-def get_original_summary(db, article_id):
-    """Get version 1 (original AI-generated) summary."""
-    return (db.query(ArticleSummary)
-            .filter(ArticleSummary.article_id == article_id,
-                    ArticleSummary.version == 1)
-            .first())

@@ -5,6 +5,6 @@ from .models import (
     User, Role, UserRole, Source, Tag,
     Article, ArticleSummary, ArticleTag, ArticleStar,
     ArticleList, ArticleListItem,
-    Digest, DigestItem, CategorySummary, Failure,
+    Digest, DigestItem, DigestSummary, CategorySummary, Failure,
     PipelineRun, AppSetting, KeywordSummary
 )
