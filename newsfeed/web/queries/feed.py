@@ -4,7 +4,9 @@ from sqlalchemy import func as sqla_func
 from sqlalchemy.orm import joinedload
 from newsfeed.storage.models import Article, ArticleTag, ArticleStar, ArticleSummary, Tag
 from newsfeed.storage.models import AppSetting, Source
-from newsfeed.storage.models import ArticleSummary
+from newsfeed.storage.models import ArticleSummary, CategorySummary
+from datetime import datetime
+from newsfeed.storage.models import Digest, DigestItem
 
 
 def get_setting(db, key, default='5'):
@@ -128,3 +130,125 @@ def search_articles(db, query, limit=20, offset=0):
             .order_by(desc(Article.date))
             .limit(limit).offset(offset)
             .all())
+
+def get_starred_tags_with_counts(db):
+    """Get tags with counts for starred articles only."""
+    return (db.query(Tag.name, sqla_func.count(ArticleTag.article_id).label('count'))
+            .join(ArticleTag, Tag.id == ArticleTag.tag_id)
+            .join(ArticleStar, ArticleTag.article_id == ArticleStar.article_id)
+            .filter(ArticleTag.removed == False)
+            .group_by(Tag.name)
+            .order_by(sqla_func.count(ArticleTag.article_id).desc())
+            .all())
+
+
+def get_starred_sources_with_counts(db):
+    """Get sources with counts for starred articles only."""
+    return (db.query(Source.name, sqla_func.count(Article.id).label('count'))
+            .join(Article, Source.id == Article.source_id)
+            .join(ArticleStar, Article.id == ArticleStar.article_id)
+            .group_by(Source.name)
+            .order_by(Source.name)
+            .all())
+
+def get_category_summaries(db, tag_names, date_from, date_to):
+    """Fetch category summaries for given tags and date range."""
+    return (db.query(CategorySummary, Tag.name)
+            .join(Tag, CategorySummary.tag_id == Tag.id)
+            .filter(Tag.name.in_(tag_names),
+                    CategorySummary.date_from >= date_from,
+                    CategorySummary.date_to <= date_to)
+            .all())
+
+def get_category_article_counts(db, tag_names, date_from, date_to):
+    """Count articles per tag within date range."""
+    return (db.query(Tag.name, sqla_func.count(sqla_func.distinct(Article.id)).label('count'))
+            .join(ArticleTag, Tag.id == ArticleTag.tag_id)
+            .join(Article, ArticleTag.article_id == Article.id)
+            .filter(Tag.name.in_(tag_names), ArticleTag.removed == False,
+                    Article.date >= date_from, Article.date <= date_to)
+            .group_by(Tag.name)
+            .all())
+
+
+def get_category_star_counts(db, tag_names, date_from, date_to):
+    """Count stars on articles per tag within date range."""
+    return (db.query(Tag.name, sqla_func.count(sqla_func.distinct(ArticleStar.id)).label('count'))
+            .join(ArticleTag, Tag.id == ArticleTag.tag_id)
+            .join(Article, ArticleTag.article_id == Article.id)
+            .join(ArticleStar, Article.id == ArticleStar.article_id)
+            .filter(Tag.name.in_(tag_names), ArticleTag.removed == False,
+                    Article.date >= date_from, Article.date <= date_to)
+            .group_by(Tag.name)
+            .all())
+
+def get_available_summary_periods(db):
+    """Get distinct date ranges from category summaries."""
+    return (db.query(CategorySummary.date_from, CategorySummary.date_to)
+            .distinct()
+            .order_by(desc(CategorySummary.date_from))
+            .all())
+
+def get_digests(db, status='sent'):
+    """Fetch digests by status with item count."""
+    return (db.query(Digest, sqla_func.count(DigestItem.id).label('item_count'))
+            .outerjoin(DigestItem)
+            .filter(Digest.status == status)
+            .group_by(Digest.id)
+            .order_by(desc(Digest.date_from))
+            .all())
+
+
+def get_digest_articles(db, digest_id):
+    """Fetch articles in a digest, ordered by sort_order."""
+    return (db.query(Article)
+            .join(DigestItem, Article.id == DigestItem.article_id)
+            .options(joinedload(Article.source),
+                     joinedload(Article.tags).joinedload(ArticleTag.tag))
+            .filter(DigestItem.digest_id == digest_id)
+            .order_by(DigestItem.sort_order)
+            .all())
+
+
+def publish_digest(db, digest_id):
+    """Publish a draft digest."""
+    digest = db.query(Digest).filter(Digest.id == digest_id).first()
+    if not digest: return False
+    digest.status = 'sent'
+    digest.sent_at = datetime.now()
+    db.commit()
+    return True
+
+def unpublish_digest(db, digest_id):
+    """Send a published digest back to draft for review."""
+    digest = db.query(Digest).filter(Digest.id == digest_id).first()
+    if not digest: return False
+    digest.status = 'draft'
+    digest.sent_at = None
+    db.commit()
+    return True
+
+def create_summary_version(db, article_id, subtitle, bullets, user_id=None):
+    """Create a new summary version for an article."""
+    max_ver = (db.query(sqla_func.max(ArticleSummary.version))
+               .filter(ArticleSummary.article_id == article_id)
+               .scalar()) or 0
+    summary = ArticleSummary(
+        article_id=article_id,
+        version=max_ver + 1,
+        subtitle=subtitle,
+        bullets=bullets,
+        is_auto=False,
+        created_by=user_id
+    )
+    db.add(summary)
+    db.commit()
+    return summary
+
+
+def get_original_summary(db, article_id):
+    """Get version 1 (original AI-generated) summary."""
+    return (db.query(ArticleSummary)
+            .filter(ArticleSummary.article_id == article_id,
+                    ArticleSummary.version == 1)
+            .first())

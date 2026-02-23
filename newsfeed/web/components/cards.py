@@ -9,12 +9,11 @@ from fasthtml.common import *
 # ── URL Helper ──────────────────────────────────────────────
 
 def build_filter_url(state, **overrides):
-    """Build /feed URL from FilterState with overrides."""
+    """Build URL preserving all filters, overriding specified ones."""
     params = state.to_params()
     params.update(overrides)
     cleaned = {k: v for k, v in params.items() if v}
-    return f"/feed?{urlencode(cleaned)}" if cleaned else "/feed"
-
+    return f"{state.base}?{urlencode(cleaned)}" if cleaned else state.base
 
 # ── Tag Helpers ─────────────────────────────────────────────
 
@@ -124,15 +123,14 @@ def tag_pill_filter(name, count, state):
     return Span(f"{name} ({count})",
                 cls=f"text-xs px-2 py-1 rounded-full cursor-pointer {cls}",
                 hx_get=build_filter_url(state, tags=new_tags),
-                hx_target="#feed-content", hx_swap="outerHTML")
-
+                hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 def clear_pill(state):
     """Render clear filter pill."""
     return Span("✕ Clear",
                 cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-red-100 text-red-600",
                 hx_get=build_filter_url(state, tags=''),
-                hx_target="#feed-content", hx_swap="outerHTML")
+                hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def more_pill(count, state):
@@ -140,7 +138,7 @@ def more_pill(count, state):
     return Span(f"+ {count} more",
                 cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-gray-200 text-gray-500",
                 hx_get=build_filter_url(state, expanded='1'),
-                hx_target="#feed-content", hx_swap="outerHTML")
+                hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def less_pill(state):
@@ -148,7 +146,7 @@ def less_pill(state):
     return Span("- less",
                 cls="text-xs px-2 py-1 rounded-full cursor-pointer bg-gray-200 text-gray-500",
                 hx_get=build_filter_url(state, expanded='0'),
-                hx_target="#feed-content", hx_swap="outerHTML")
+                hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def tag_filter(tags_with_counts, state, top_n=5):
@@ -172,7 +170,7 @@ def source_filter(sources_with_counts, state):
     return Div(
         Span("Source: ", cls="text-sm font-medium"),
         Select(*options, name="source",
-               hx_get="/feed", hx_target="#feed-content", hx_swap="outerHTML",
+               hx_get=state.base, hx_target=f"#{state.target}", hx_swap="outerHTML",
                hx_include="this", hx_vals=json.dumps(other_params),
                cls="text-sm border rounded px-2 py-1"),
         cls="flex items-center gap-2"
@@ -187,7 +185,7 @@ def date_button(label, period, state):
     return Span(label,
                 cls=f"text-xs px-2 py-1 rounded-full cursor-pointer {cls}",
                 hx_get=build_filter_url(state, date=new_date),
-                hx_target="#feed-content", hx_swap="outerHTML")
+                hx_target=f"#{state.target}", hx_swap="outerHTML")
 
 
 def date_filter(state):
@@ -206,7 +204,7 @@ def search_box(state, debounce=300):
         Input(type="text", name="search", value=state.search,
               placeholder="Search title/summary...",
               hx_get=build_filter_url(state, search=''),
-              hx_target="#feed-content", hx_swap="outerHTML",
+              hx_target=f"#{state.target}", hx_swap="outerHTML",
               hx_trigger=f"keyup changed delay:{debounce}ms",
               hx_include="this",
               cls="text-sm border rounded px-2 py-1 w-64"),
@@ -221,9 +219,11 @@ def highlight(text, term):
 
 def load_more_sentinel(state, offset, page_size):
     """Hidden div that triggers next page load when scrolled into view."""
-    base = build_filter_url(state).replace('/feed?', '/feed/more?')
-    if '?' not in base: base = '/feed/more?'
-    url = f"{base}&offset={offset}&page_size={page_size}"
+    params = state.to_params()
+    params['offset'] = str(offset)
+    params['page_size'] = str(page_size)
+    cleaned = {k: v for k, v in params.items() if v}
+    url = f"{state.base}/more?{urlencode(cleaned)}"
     return Div(hx_get=url,
                hx_trigger="revealed",
                hx_swap="outerHTML",
@@ -243,4 +243,170 @@ def collapsible_section(title, content, section_id, open=False):
         Div(content, cls="p-3") if open else None,
         id=f"section-{section_id}",
         cls="border rounded mb-4"
+    )
+
+def period_label(date_from, date_to):
+    """Format date range as readable label."""
+    return f"{date_from.strftime('%b %d')} - {date_to.strftime('%b %d, %Y')}"
+
+
+def category_period_dropdown(periods, active_from=None, active_to=None):
+    """Render dropdown for selecting summary time period."""
+    options = []
+    for df, dt in periods:
+        label = period_label(df, dt)
+        selected = (df == active_from and dt == active_to)
+        options.append(Option(label, value=f"{df}|{dt}", selected=selected))
+    return Div(
+        Span("Period: ", cls="text-sm font-medium"),
+        Select(*options, name="period",
+               hx_get="/executive/categories",
+               hx_target="#categories-content",
+               hx_swap="outerHTML",
+               hx_include="this",
+               cls="text-sm border rounded px-2 py-1"),
+        cls="flex items-center gap-2 mb-4"
+    )
+
+def category_card(tag_name, summary_text, article_count, star_count):
+    """Render a single category summary card."""
+    return Div(
+        Div(
+            Strong(tag_name),
+            Span(f"  ({article_count} articles, {star_count} ⭐)",
+                 cls="text-sm text-gray-500"),
+            cls="mb-2"
+        ),
+        P(summary_text, cls="text-sm text-gray-700 leading-relaxed"),
+        cls="p-4 border rounded mb-3"
+    )
+
+def digest_tab(label, count, tab, active_tab):
+    """Render a single digest ribbon tab."""
+    is_active = tab == active_tab
+    cls = ("bg-blue-600 text-white font-bold" if is_active
+           else "bg-gray-100 text-gray-600 hover:bg-gray-200")
+    return Span(f"{label} ({count})",
+                cls=f"text-sm px-3 py-1 rounded-full cursor-pointer {cls}",
+                hx_get=f"/executive/digests?tab={tab}",
+                hx_target="#digests-content",
+                hx_swap="outerHTML")
+
+
+def digest_ribbon(draft_count, sent_count, active_tab='draft'):
+    """Render digest tab ribbon."""
+    return Div(
+        digest_tab("To be Published", draft_count, "draft", active_tab),
+        digest_tab("Published", sent_count, "sent", active_tab),
+        cls="flex gap-2 mb-4"
+    )
+
+
+def digest_item(digest, item_count, show_publish=False):
+    """Render a single digest list item."""
+    title = digest.title or f"{digest.date_from} — {digest.date_to}"
+    return Div(
+        Div(
+            Span(f"📋 ", cls="text-lg"),
+            Strong(title, cls="cursor-pointer",
+                   hx_get=f"/executive/digests/{digest.id}/expand?tab={'draft' if show_publish else 'sent'}",
+                   hx_target=f"#digest-{digest.id}",
+                   hx_swap="outerHTML"),
+            Span(f"  ({item_count} articles)", cls="text-sm text-gray-500"),
+            Button("Publish", cls="ml-4 text-xs px-2 py-1 bg-green-500 text-white rounded",
+                   hx_post=f"/executive/digests/{digest.id}/publish",
+                   hx_target="#digests-content",
+                   hx_swap="outerHTML") if show_publish else
+            Button("Review", cls="ml-4 text-xs px-2 py-1 bg-yellow-500 text-white rounded",
+                   hx_post=f"/executive/digests/{digest.id}/review",
+                   hx_target="#digests-content",
+                   hx_swap="outerHTML"),
+            cls="flex items-center"
+        ),
+        id=f"digest-{digest.id}",
+        cls="p-3 border-b hover:bg-gray-50"
+    )
+
+def digest_expanded(digest, item_count, articles, article_tags_fn, show_publish=False, summaries=None):
+    """Render expanded digest with article list and editable summaries."""
+    title = digest.title or f"{digest.date_from} — {digest.date_to}"
+    summaries = summaries or {}
+    return Div(
+        Div(
+            Span(f"📋 ", cls="text-lg"),
+            Strong(title, cls="cursor-pointer",
+                   hx_get=f"/executive/digests/{digest.id}/collapse?tab={'draft' if show_publish else 'sent'}",
+                   hx_target=f"#digest-{digest.id}",
+                   hx_swap="outerHTML"),
+            Span(f"  ({item_count} articles)", cls="text-sm text-gray-500"),
+            Button("Publish", cls="ml-4 text-xs px-2 py-1 bg-green-500 text-white rounded",
+                   hx_post=f"/executive/digests/{digest.id}/publish",
+                   hx_target="#digests-content",
+                   hx_swap="outerHTML") if show_publish else
+            Button("Review", cls="ml-4 text-xs px-2 py-1 bg-yellow-500 text-white rounded",
+                   hx_post=f"/executive/digests/{digest.id}/review",
+                   hx_target="#digests-content",
+                   hx_swap="outerHTML"),
+            cls="flex items-center mb-2"
+        ),
+        Div(*[Div(
+            Span(f"• {a.title}", cls="text-sm font-medium"),
+            Span(f" — {a.source.name}", cls="text-xs text-gray-500"),
+            digest_article_summary(a.id, summaries.get(a.id), show_edit=show_publish),
+            cls="py-2"
+        ) for a in articles], cls="ml-6 border-l pl-3"),
+        id=f"digest-{digest.id}",
+        cls="p-3 border-b bg-gray-50"
+    )
+
+def digest_article_summary(article_id, summary, show_edit=False):
+    """Render article summary in digest with optional edit/revert buttons."""
+    if not summary:
+        return Div(P("No summary", cls="text-sm text-gray-400 italic"),
+                   id=f"digest-summary-{article_id}")
+    bullets = summary.bullets or []
+    actions = []
+    if show_edit:
+        actions.append(Span("✏️ Edit", cls="text-xs text-blue-600 cursor-pointer",
+                            hx_get=f"/executive/digests/article/{article_id}/edit",
+                            hx_target=f"#digest-summary-{article_id}",
+                            hx_swap="outerHTML"))
+        if summary.version > 1:
+            actions.append(Span("↩ Revert to original", cls="text-xs text-yellow-600 cursor-pointer ml-2",
+                                hx_post=f"/executive/digests/article/{article_id}/revert",
+                                hx_target=f"#digest-summary-{article_id}",
+                                hx_swap="outerHTML"))
+    return Div(
+        P(summary.subtitle, cls="text-sm font-medium") if summary.subtitle else None,
+        Ul(*[Li(b, cls="text-sm text-gray-600") for b in bullets], cls="list-disc ml-5 mt-1") if bullets else None,
+        Div(*actions, cls="mt-1") if actions else None,
+        id=f"digest-summary-{article_id}",
+        cls="mt-1"
+    )
+
+def digest_article_edit_form(article_id, summary):
+    """Render inline edit form for article summary."""
+    subtitle = summary.subtitle or '' if summary else ''
+    bullets = '\n'.join(summary.bullets or []) if summary else ''
+    return Div(
+        Label("Subtitle", cls="text-xs font-medium"),
+        Input(type="text", name="subtitle", value=subtitle,
+              cls="w-full text-sm border rounded px-2 py-1 mb-2"),
+        Label("Bullets (one per line)", cls="text-xs font-medium"),
+        Textarea(bullets, name="bullets", rows=5,
+                 cls="w-full text-sm border rounded px-2 py-1 mb-2"),
+        Div(
+            Button("Save", cls="text-xs px-2 py-1 bg-green-500 text-white rounded mr-2",
+                   hx_post=f"/executive/digests/article/{article_id}/save",
+                   hx_target=f"#digest-summary-{article_id}",
+                   hx_swap="outerHTML",
+                   hx_include="closest div"),
+            Span("Cancel", cls="text-xs text-gray-500 cursor-pointer",
+                 hx_get=f"/executive/digests/article/{article_id}/cancel",
+                 hx_target=f"#digest-summary-{article_id}",
+                 hx_swap="outerHTML"),
+            cls="flex items-center"
+        ),
+        id=f"digest-summary-{article_id}",
+        cls="mt-1 p-2 border rounded bg-white"
     )

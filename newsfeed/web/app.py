@@ -9,13 +9,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from newsfeed.web.routes.executive import ar as executive_routes
 
 
-def before(req, session):
-    req.state.db = get_session()
-
-def after(req, resp):
-    if hasattr(req.state, 'db'):
-        req.state.db.close()
-
 class DBSessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         request.state.db = get_session()
