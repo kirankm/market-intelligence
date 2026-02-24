@@ -4,8 +4,8 @@ from monsterui.all import DivFullySpaced, DivHStacked, TextPresets
 
 NAV_BY_ROLE = {
     'contributor': [('Feed', '/feed')],
-    'viewer':      [('Executive', '/executive'), ('Feed', '/feed'), ('Sources', '/admin/sources')],
-    'admin':       [('Feed', '/feed'), ('Executive', '/executive'), ('Sources', '/admin/sources')],
+    'viewer':      [('Executive', '/executive'), ('Feed', '/feed'), ('Admin', '/admin/sources')],
+    'admin':       [('Feed', '/feed'), ('Executive', '/executive'), ('Admin', '/admin/sources')],
     'moderator':   [('Feed', '/feed')],
 }
 

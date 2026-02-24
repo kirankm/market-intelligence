@@ -37,7 +37,18 @@ BTN_PRIMARY = "text-xs px-3 py-1 bg-primary text-primary-foreground rounded hove
 EXEC_INPUT = "text-sm border border-input rounded px-2.5 py-1.5 bg-background text-foreground w-full focus:outline-none focus:ring-1 focus:ring-ring transition"
 
 
+# ── Admin Components ─────────────────────────────────────────
+ADMIN_TABS = [
+    ('Costs', 'costs'),
+    ('Sources', 'sources'),
+    ('Users', 'users'),
+    ('Settings', 'settings'),
+    ('Jobs', 'jobs'),
+]
+
 # ── Card Components ─────────────────────────────────────────
+
+
 
 def tag_pill(name):
     """Render a single tag pill."""
@@ -518,3 +529,97 @@ def keyword_summaries_list(summaries):
         **attrs
     )
 
+def admin_tab(label, tab, active_tab):
+    """Render a single admin tab."""
+    is_active = tab == active_tab
+    return Span(label,
+                cls=PILL_ACTIVE if is_active else PILL_INACTIVE,
+                hx_get=f"/admin/tab/{tab}",
+                hx_target="#admin-content",
+                hx_swap="outerHTML")
+
+
+def admin_ribbon(active_tab='settings'):
+    """Render admin tab ribbon."""
+    return DivLAligned(
+        *[admin_tab(label, tab, active_tab) for label, tab in ADMIN_TABS],
+        cls="gap-2 mb-4"
+    )
+
+
+def settings_row(key, value):
+    """Render a single settings row."""
+    return Div(
+        DivLAligned(
+            Span(key, cls="text-sm font-medium text-foreground w-48"),
+            Span(value, cls="text-sm text-muted-foreground flex-1",
+                 id=f"setting-val-{key}"),
+            Span("✏️", cls="text-xs text-primary cursor-pointer hover:underline",
+                 hx_get=f"/admin/settings/{key}/edit",
+                 hx_target=f"#setting-{key}",
+                 hx_swap="outerHTML"),
+            Span("✕", cls="text-xs text-destructive cursor-pointer hover:underline ml-2",
+                 hx_delete=f"/admin/settings/{key}/delete",
+                 hx_target="#admin-content",
+                 hx_swap="outerHTML",
+                 hx_confirm=f"Delete setting '{key}'?"),
+            cls="gap-3"
+        ),
+        id=f"setting-{key}",
+        cls="py-2 border-b border-border"
+    )
+
+
+def settings_edit_row(key, value):
+    """Render inline edit form for a setting."""
+    return Div(
+        DivLAligned(
+            Span(key, cls="text-sm font-medium text-foreground w-48"),
+            Input(type="text", name="value", value=value,
+                  cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground flex-1"),
+            Button("Save", cls=BTN_SUCCESS,
+                   hx_post=f"/admin/settings/{key}/save",
+                   hx_target="#admin-content",
+                   hx_swap="outerHTML",
+                   hx_include=f"#setting-{key}"),
+            Span("Cancel", cls="text-xs text-muted-foreground cursor-pointer hover:text-foreground",
+                 hx_get=f"/admin/tab/settings",
+                 hx_target="#admin-content",
+                 hx_swap="outerHTML"),
+            cls="gap-3"
+        ),
+        id=f"setting-{key}",
+        cls="py-2 border-b border-border"
+    )
+
+
+def settings_add_form():
+    """Render form to add a new setting."""
+    return Card(
+        DivLAligned(
+            Input(type="text", name="key", placeholder="Key",
+                  cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground w-48"),
+            Input(type="text", name="value", placeholder="Value",
+                  cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground flex-1"),
+            Button("Add", cls=BTN_PRIMARY,
+                   hx_post="/admin/settings/add",
+                   hx_target="#admin-content",
+                   hx_swap="outerHTML",
+                   hx_include="#settings-add-form"),
+            cls="gap-3"
+        ),
+        id="settings-add-form",
+        cls="mt-4"
+    )
+
+
+def settings_table(settings):
+    """Render full settings table."""
+    rows = [settings_row(s.key, s.value) for s in settings]
+    if not rows:
+        rows = [P("No settings configured", cls="text-sm text-muted-foreground italic")]
+    return Div(
+        H4("App Settings", cls="text-sm font-semibold text-foreground mb-3"),
+        *rows,
+        settings_add_form()
+    )
