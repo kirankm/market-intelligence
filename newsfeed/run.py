@@ -25,4 +25,15 @@ def main():
             run(site_name, args.from_date, args.to_date, args.max_pages, args.no_verify_ssl)
 
 if __name__ == "__main__":
-    main()
+    from newsfeed.web.queries.feed import set_job_complete
+    from newsfeed.storage.database import get_session
+    try:
+        main()
+        db = get_session()
+        set_job_complete(db, 'pipeline', success=True)
+        db.close()
+    except Exception as e:
+        db = get_session()
+        set_job_complete(db, 'pipeline', success=False, error=str(e))
+        db.close()
+

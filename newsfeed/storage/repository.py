@@ -4,8 +4,7 @@ import hashlib, logging
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from .database import get_session
-from .models import Article, ArticleSummary, ArticleTag, Tag, Source, Failure
-
+from .models import Article, ArticleSummary, ArticleTag, Tag, Source, Failure, PipelineRun
 log = logging.getLogger("newsfeed.storage")
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -93,5 +92,38 @@ def save_article(article_dict: dict, source_name: str, source_url: str) -> bool:
         session.rollback()
         log.error(f"Failed to save {article_dict.get('url')}: {e}")
         return False
+    finally:
+        session.close()
+
+def update_source_health(source_name: str, success: bool):
+    session = get_session()
+    try:
+        source = session.query(Source).filter_by(name=source_name).first()
+        if source:
+            if success:
+                source.last_success = datetime.now(timezone.utc)
+            else:
+                source.last_failure = datetime.now(timezone.utc)
+            session.commit()
+    finally:
+        session.close()
+
+
+def save_pipeline_run(source_name: str, articles_fetched: int, cost_data: dict):
+    session = get_session()
+    try:
+        source = session.query(Source).filter_by(name=source_name).first()
+        if not source:
+            return
+        run = PipelineRun(
+            source_id=source.id,
+            articles_fetched=articles_fetched,
+            input_tokens=cost_data.get("input_tokens", 0),
+            output_tokens=cost_data.get("output_tokens", 0),
+            cost=cost_data.get("total_cost", 0),
+        )
+        session.add(run)
+        session.commit()
+        log.info(f"Saved pipeline run for {source_name}")
     finally:
         session.close()

@@ -168,20 +168,29 @@ if __name__ == "__main__":
 
     target = date.fromisoformat(args.date) if args.date else date.today()
 
-    if args.force_weekly:
+    from newsfeed.web.queries.feed import set_job_complete
+    try:
+        if args.force_weekly:
+            db = get_session()
+            cats = get_summary_categories(db)
+            min_a = get_min_articles(db)
+            week_start = target - timedelta(days=6)
+            run_period(db, cats, week_start, target, "weekly", min_a)
+            db.close()
+        elif args.force_monthly:
+            db = get_session()
+            cats = get_summary_categories(db)
+            min_a = get_min_articles(db)
+            month_start = target.replace(day=1)
+            run_period(db, cats, month_start, target, "monthly", min_a)
+            db.close()
+        else:
+            run(target)
         db = get_session()
-        cats = get_summary_categories(db)
-        min_a = get_min_articles(db)
-        week_start = target - timedelta(days=6)
-        run_period(db, cats, week_start, target, "weekly", min_a)
+        set_job_complete(db, 'category_summarizer', success=True)
         db.close()
-    elif args.force_monthly:
+    except Exception as e:
         db = get_session()
-        cats = get_summary_categories(db)
-        min_a = get_min_articles(db)
-        month_start = target.replace(day=1)
-        run_period(db, cats, month_start, target, "monthly", min_a)
+        set_job_complete(db, 'category_summarizer', success=False, error=str(e))
         db.close()
-    else:
-        run(target)
 

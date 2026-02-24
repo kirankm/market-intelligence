@@ -104,7 +104,6 @@ def run_loop(poll_interval=5):
             db.close()
         time.sleep(poll_interval)
 
-
 if __name__ == "__main__":
     import argparse
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -112,9 +111,19 @@ if __name__ == "__main__":
     parser.add_argument("--once", action="store_true", help="Process pending and exit")
     parser.add_argument("--interval", type=int, default=5, help="Poll interval in seconds")
     args = parser.parse_args()
-    if args.once:
+
+    from newsfeed.web.queries.feed import set_job_complete
+    try:
+        if args.once:
+            db = get_session()
+            run_once(db)
+            db.close()
+        else:
+            run_loop(args.interval)
         db = get_session()
-        run_once(db)
+        set_job_complete(db, 'keyword_summarizer', success=True)
         db.close()
-    else:
-        run_loop(args.interval)
+    except Exception as e:
+        db = get_session()
+        set_job_complete(db, 'keyword_summarizer', success=False, error=str(e))
+        db.close()

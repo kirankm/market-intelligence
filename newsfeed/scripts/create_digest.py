@@ -168,8 +168,18 @@ if __name__ == "__main__":
 
     target = date.fromisoformat(args.date) if args.date else None
 
-    if args.backfill:
-        backfill(target)
-    else:
-        run(target)
+    from newsfeed.web.queries.feed import set_job_complete
+    from newsfeed.storage.database import get_session
+    try:
+        if args.backfill:
+            backfill(target)
+        else:
+            run(target)
+        db = get_session()
+        set_job_complete(db, 'digest_creator', success=True)
+        db.close()
+    except Exception as e:
+        db = get_session()
+        set_job_complete(db, 'digest_creator', success=False, error=str(e))
+        db.close()
 

@@ -4,7 +4,7 @@ import logging
 from newsfeed.config import SiteConfig, SiteState, load_site_config, load_state, save_state
 from newsfeed.fetch import fetch_new_articles
 from newsfeed.processing import process_article
-from newsfeed.storage.repository import save_article
+from newsfeed.storage.repository import save_article, update_source_health, save_pipeline_run
 from newsfeed.cost import get_daily_cost, reset_daily_usage
 
 log = logging.getLogger("newsfeed.pipeline")
@@ -58,6 +58,8 @@ def run(site_name, from_date=None, to_date=None, max_pages=5, no_verify_ssl=Fals
         else:
             failed += 1
 
+    update_source_health(config.name, success=(failed == 0))
     save_state(state)
     cost = report()
+    save_pipeline_run(config.name, len(articles), cost)
     log.info(f"=== {config.name}: {len(articles)} fetched, {saved} saved, {failed} failed ===")
