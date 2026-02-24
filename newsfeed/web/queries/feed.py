@@ -286,3 +286,10 @@ def get_recent_keyword_summaries(db, user_id=None, limit=10):
     q = q.order_by(desc(KeywordSummary.created_at)).limit(limit)
     return q.all()
 
+def delete_keyword_summary(db, summary_id):
+    """Hard delete a keyword summary."""
+    ks = db.query(KeywordSummary).filter(KeywordSummary.id == summary_id).first()
+    if not ks: return False
+    db.delete(ks)
+    db.commit()
+    return True

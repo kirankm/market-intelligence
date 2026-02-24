@@ -285,9 +285,26 @@ def category_period_dropdown(periods, active_from=None, active_to=None):
         cls="gap-2 mb-4"
     )
 
+def category_tab(name, active_name, period_from, period_to):
+    """Render a single category ribbon tab."""
+    is_active = name == active_name
+    return Span(name,
+                cls=PILL_ACTIVE if is_active else PILL_INACTIVE,
+                hx_get=f"/executive/categories/select?category={name}&period={period_from}|{period_to}",
+                hx_target="#categories-content",
+                hx_swap="outerHTML")
+
+
+def category_ribbon(tag_names, active_name, period_from, period_to):
+    """Render horizontal category tabs."""
+    return DivLAligned(
+        *[category_tab(n, active_name, period_from, period_to) for n in tag_names],
+        cls="gap-2 flex-wrap mb-4"
+    )
+
 
 def category_card(tag_name, summary_text, article_count, star_count):
-    """Render a single category summary card."""
+    """Render selected category's summary."""
     return Card(
         Div(
             Strong(tag_name, cls="text-foreground"),
@@ -296,7 +313,6 @@ def category_card(tag_name, summary_text, article_count, star_count):
             cls="mb-2"
         ),
         P(summary_text, cls="text-sm text-muted-foreground leading-relaxed"),
-        cls="mb-3"
     )
 
 # ── Digests ─────────────────────────────────────────────────
@@ -450,8 +466,7 @@ def exec_search_results(articles, search, article_tags_fn, min_for_summary=5):
     parts.extend(cards)
     return Div(*parts) if parts else P("Type to search", cls="text-sm text-muted-foreground italic")
 
-
-def keyword_summary_item(ks):
+def keyword_summary_item(ks, expanded=True):
     """Render a single saved keyword summary."""
     if ks.status == 'pending':
         return Div(
@@ -466,22 +481,28 @@ def keyword_summary_item(ks):
             hx_swap="outerHTML",
             cls="py-2 border-b border-border"
         )
-    return Card(
-        Div(
-            Span(f"🔍 \"{ks.query}\"", cls="text-sm font-medium text-foreground"),
-            Span(f" — {ks.article_count} articles", cls="text-xs text-muted-foreground"),
-            Span(f" — {ks.created_at.strftime('%b %d, %H:%M')}", cls="text-xs text-muted-foreground"),
-            cls="mb-1"
-        ),
-        P(ks.summary, cls="text-sm text-muted-foreground leading-relaxed"),
-        cls="mb-2"
+    header = DivLAligned(
+        Span(f"{'▼' if expanded else '►'} 🔍 \"{ks.query}\"",
+             cls="text-sm font-medium text-foreground cursor-pointer",
+             hx_get=f"/executive/search/summary/{ks.id}/toggle?expanded={'0' if expanded else '1'}",
+             hx_target=f"#ks-{ks.id}",
+             hx_swap="outerHTML"),
+        Span(f"— {ks.article_count} articles", cls="text-xs text-muted-foreground"),
+        Span(f"— {ks.created_at.strftime('%b %d, %H:%M')}", cls="text-xs text-muted-foreground"),
+        Span("✕", cls="text-xs text-destructive cursor-pointer hover:text-destructive/80 ml-auto",
+             hx_delete=f"/executive/search/summary/{ks.id}/delete",
+             hx_target="#search-summaries-list",
+             hx_swap="outerHTML",
+             hx_confirm="Delete this summary?"),
+        cls="gap-2"
     )
-
+    body = P(ks.summary, cls="text-sm text-muted-foreground leading-relaxed mt-1") if expanded else None
+    return Div(header, body, id=f"ks-{ks.id}", cls="py-2 border-b border-border")
 
 def keyword_summaries_list(summaries):
     """Render persistent list of generated summaries."""
     has_pending = any(ks.status == 'pending' for ks in summaries)
-    items = [keyword_summary_item(ks) for ks in summaries]
+    items = [keyword_summary_item(ks, expanded=False) for ks in summaries]
     if not items:
         items = [P("No summaries generated yet", cls="text-sm text-muted-foreground italic")]
     attrs = {}

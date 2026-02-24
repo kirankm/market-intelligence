@@ -9,7 +9,8 @@ from newsfeed.web.components.cards import (
     date_filter, category_period_dropdown, category_card,
     digest_ribbon, digest_item, digest_expanded,
     digest_summary_display, digest_summary_edit_form,
-    exec_search_box, exec_search_results, keyword_summaries_list
+    exec_search_box, exec_search_results, keyword_summaries_list,
+    category_ribbon, category_tab, keyword_summary_item
 )
 from newsfeed.web.queries.feed import (
     get_starred_articles, get_tags_with_counts, get_sources_with_counts,
@@ -20,7 +21,7 @@ from newsfeed.web.queries.feed import (
     publish_digest, unpublish_digest, get_latest_digest_summary,
     get_original_digest_summary, create_digest_summary_version,
     search_articles, create_keyword_summary, get_keyword_summary,
-    get_recent_keyword_summaries
+    get_recent_keyword_summaries, delete_keyword_summary
 )
 
 ar = APIRouter()
@@ -61,7 +62,7 @@ def starred_content(db, user_id, state):
                starred_list(db, user_id, state),
                id="starred-content")
 
-def section_category_summaries(db, period_from=None, period_to=None):
+def section_category_summaries(db, period_from=None, period_to=None, active_category=None):
     """Category summaries section content."""
     periods = get_available_summary_periods(db)
     if not periods: return P("No summaries available", cls=TEXT_EMPTY)
@@ -70,15 +71,22 @@ def section_category_summaries(db, period_from=None, period_to=None):
     tag_names_str = get_setting(db, 'summary_categories', '')
     tag_names = [t.strip() for t in tag_names_str.split(',') if t.strip()]
     if not tag_names: return P("No categories configured", cls=TEXT_EMPTY)
+    if not active_category:
+        active_category = tag_names[0]
     summaries = get_category_summaries(db, tag_names, period_from, period_to)
     article_counts = dict(get_category_article_counts(db, tag_names, period_from, period_to))
     star_counts = dict(get_category_star_counts(db, tag_names, period_from, period_to))
-    cards = [category_card(name, summary.summary or "No summary",
-                           article_counts.get(name, 0), star_counts.get(name, 0))
-             for summary, name in summaries]
+    summary_map = {name: s.summary or "No summary" for s, name in summaries}
+    card = category_card(
+        active_category,
+        summary_map.get(active_category, "No summary for this category"),
+        article_counts.get(active_category, 0),
+        star_counts.get(active_category, 0)
+    ) if active_category else None
     return Div(
         category_period_dropdown(periods, period_from, period_to),
-        *cards if cards else [P("No summaries for this period", cls=TEXT_EMPTY)],
+        category_ribbon(tag_names, active_category, period_from, period_to),
+        card,
         id="categories-content"
     )
 
@@ -162,7 +170,7 @@ def get(session, request, tags: str = '', source: str = '', date: str = '', expa
     return starred_content(db, user_id, state)
 
 @ar('/executive/categories')
-def get(session, request, period: str = ''):
+def get(session, request, period: str = '', category: str = ''):
     db = request.state.db
     period_from, period_to = None, None
     if period and '|' in period:
@@ -170,7 +178,7 @@ def get(session, request, period: str = ''):
         from datetime import date
         period_from = date.fromisoformat(parts[0])
         period_to = date.fromisoformat(parts[1])
-    return section_category_summaries(db, period_from, period_to)
+    return section_category_summaries(db, period_from, period_to, active_category=category or None)
 
 @ar('/executive/digests')
 def get(session, request, tab: str = 'draft'):
@@ -261,5 +269,32 @@ def post(session, request, search: str = ''):
     user_id = session.get('user_id')
     articles = search_articles(db, search) if search else []
     create_keyword_summary(db, search, len(articles), user_id)
+    summaries = get_recent_keyword_summaries(db, user_id)
+    return keyword_summaries_list(summaries)
+
+@ar('/executive/categories/select')
+def get(session, request, category: str = '', period: str = ''):
+    db = request.state.db
+    period_from, period_to = None, None
+    if period and '|' in period:
+        parts = period.split('|')
+        from datetime import date
+        period_from = date.fromisoformat(parts[0])
+        period_to = date.fromisoformat(parts[1])
+    return section_category_summaries(db, period_from, period_to, active_category=category)
+
+@ar('/executive/search/summary/{summary_id}/toggle')
+def get(summary_id: int, session, request, expanded: str = '1'):
+    db = request.state.db
+    ks = get_keyword_summary(db, summary_id)
+    if not ks: return P("Not found", cls=TEXT_ERROR)
+    return keyword_summary_item(ks, expanded=expanded == '1')
+
+
+@ar('/executive/search/summary/{summary_id}/delete')
+def delete(summary_id: int, session, request):
+    db = request.state.db
+    user_id = session.get('user_id')
+    delete_keyword_summary(db, summary_id)
     summaries = get_recent_keyword_summaries(db, user_id)
     return keyword_summaries_list(summaries)
