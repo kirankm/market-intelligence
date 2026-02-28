@@ -8,8 +8,8 @@ from newsfeed.processing.tagging import auto_tag
 from newsfeed.processing.extraction import extract_jina_meta, extract_body_by_markers, extract_body_by_heuristic
 from newsfeed.processing.cleanup import decode_entities, normalize_whitespace, strip_links, strip_images, strip_byline
 from newsfeed.processing.noise import remove_noise
-from newsfeed.fetch.client import make_client, jina_fetch
-from newsfeed.config import load_site_config, SiteConfig
+from newsfeed.fetch.client import jina_fetch
+import httpx
 
 log = logging.getLogger("newsfeed.backfill")
 
@@ -43,15 +43,14 @@ def get_articles_missing_tags(session):
             .all())
 
 
-def refetch_content(article, config=None):
+def refetch_content(article):
     """Re-fetch and clean content for an article missing content."""
     if not article.url:
         log.warning(f"Article {article.id} has no URL — cannot refetch")
         return None
     try:
-        if config is None:
-            config = SiteConfig(name="default", listing_url="")
-        client = make_client(config)
+        transport = httpx.HTTPTransport(retries=3, verify=True)
+        client = httpx.Client(transport=transport, timeout=30)
         raw = jina_fetch(client, article.url)
         client.close()
 
