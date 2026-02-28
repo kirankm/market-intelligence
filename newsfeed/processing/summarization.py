@@ -126,8 +126,10 @@ def summarize(text: str, url: str = "", model: str = None,
             )
             # Track cost
             usage = response.usage_metadata
-            track_usage(usage.prompt_token_count, usage.candidates_token_count, model)
-            log.info(f"Summarized ({usage.prompt_token_count} in, {usage.candidates_token_count} out tokens)")
+            input_tok = getattr(usage, 'prompt_token_count', None) or 0
+            output_tok = getattr(usage, 'candidates_token_count', None) or 0
+            track_usage(input_tok, output_tok, model)
+            log.info(f"Summarized ({input_tok} in, {output_tok} out tokens)")
 
             result = extract_json(response.text) if not use_json_mode else json.loads(response.text)
 
