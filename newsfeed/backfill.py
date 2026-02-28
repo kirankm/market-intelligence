@@ -5,7 +5,11 @@ from newsfeed.storage.database import get_session
 from newsfeed.storage.models import Article, ArticleSummary, ArticleTag, Tag
 from newsfeed.processing.summarization import summarize
 from newsfeed.processing.tagging import auto_tag
-from newsfeed.config import load_site_config
+from newsfeed.processing.extraction import extract_jina_meta, extract_body_by_markers, extract_body_by_heuristic
+from newsfeed.processing.cleanup import decode_entities, normalize_whitespace, strip_links, strip_images, strip_byline
+from newsfeed.processing.noise import remove_noise
+from newsfeed.fetch.client import make_client, jina_fetch
+from newsfeed.config import load_site_config, SiteConfig
 
 log = logging.getLogger("newsfeed.backfill")
 
@@ -39,13 +43,47 @@ def get_articles_missing_tags(session):
             .all())
 
 
+def refetch_content(article, config=None):
+    """Re-fetch and clean content for an article missing content."""
+    if not article.url:
+        log.warning(f"Article {article.id} has no URL — cannot refetch")
+        return None
+    try:
+        if config is None:
+            config = SiteConfig(name="default", url="", listing_url="", listing_regex="")
+        client = make_client(config)
+        raw = jina_fetch(client, article.url)
+        client.close()
+
+        # Extract and clean — same as processing pipeline
+        meta = extract_jina_meta(raw)
+        body = meta["body"]
+        body = remove_noise(body)
+        body = extract_body_by_heuristic(body) if body else ""
+        body = strip_links(body)
+        body = strip_images(body)
+        body = decode_entities(body)
+        body = normalize_whitespace(body)
+
+        log.info(f"Refetched content for article {article.id}: {len(body)} chars")
+        return body
+    except Exception as e:
+        log.error(f"Failed to refetch article {article.id}: {e}")
+        return None
+
+
 def backfill_summaries(session, articles):
     """Reprocess summaries for articles with missing/empty summaries."""
     fixed = 0
     for article in articles:
         if not article.content:
-            log.warning(f"Skipping article {article.id} — no content to summarize")
-            continue
+            log.info(f"Article {article.id} missing content — refetching")
+            content = refetch_content(article)
+            if not content:
+                log.warning(f"Skipping article {article.id} — refetch failed")
+                continue
+            article.content = content
+            session.commit()
 
         log.info(f"Backfilling summary for: {article.title[:60]}")
         result = summarize(article.content, url=article.url)
