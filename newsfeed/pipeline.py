@@ -63,3 +63,9 @@ def run(site_name, from_date=None, to_date=None, max_pages=5, no_verify_ssl=Fals
     cost = report()
     save_pipeline_run(config.name, len(articles), cost)
     log.info(f"=== {config.name}: {len(articles)} fetched, {saved} saved, {failed} failed ===")
+
+    # Auto-heal: backfill any articles missing summaries or tags
+    from newsfeed.backfill import run_backfill
+    log.info("=== Running auto-heal backfill ===")
+    backfill_result = run_backfill()
+    log.info(f"=== Backfill: {backfill_result['summaries_fixed']} summaries, {backfill_result['tags_fixed']} tags fixed ===")

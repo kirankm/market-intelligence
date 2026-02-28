@@ -31,3 +31,13 @@ def run_category_summaries(request):
         return JSONResponse({'status': 'success'})
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+@ar.get('/backfill')
+def backfill(request):
+    try:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+        from newsfeed.backfill import run_backfill
+        result = run_backfill()
+        return JSONResponse({'status': 'success', **result})
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)

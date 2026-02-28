@@ -123,7 +123,7 @@ def summarize(text: str, url: str = "", model: str = None,
         except Exception as e:
             log.warning(f"Attempt {attempt}/{max_retries} failed: {e}")
             if attempt < max_retries:
-                time.sleep(retry_delay * attempt)  # exponential-ish backoff
+                time.sleep(retry_delay * (2 ** attempt))  # exponential backoff
             else:
                 log.error(f"All {max_retries} attempts failed for: {url}")
                 log_failure(url, "summarize", str(e), max_retries)
