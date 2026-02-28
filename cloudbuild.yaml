@@ -13,3 +13,5 @@ steps:
     entrypoint: 'gcloud'
 images:
   - 'us-central1-docker.pkg.dev/mi-app-kiran/mi-repo/newsfeed:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
