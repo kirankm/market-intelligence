@@ -55,6 +55,7 @@ def load_all_site_configs() -> dict[str, SiteConfig]:
     """Load all site configs from the sites/ folder."""
     configs = {}
     for path in SITES_DIR.glob("*.json"):
+        if path.stem == 'tags': continue
         with open(path) as f:
             data = json.load(f)
         configs[path.stem] = SiteConfig(**data)
