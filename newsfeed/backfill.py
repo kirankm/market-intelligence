@@ -50,7 +50,7 @@ def refetch_content(article, config=None):
         return None
     try:
         if config is None:
-            config = SiteConfig(name="default", url="", listing_url="", listing_regex="")
+            config = SiteConfig(name="default", listing_url="")
         client = make_client(config)
         raw = jina_fetch(client, article.url)
         client.close()
