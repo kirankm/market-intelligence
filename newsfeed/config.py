@@ -1,3 +1,6 @@
+# ── AI Model ────────────────────────────────────────────────
+DEFAULT_MODEL = "gemma-3-27b-it"
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional

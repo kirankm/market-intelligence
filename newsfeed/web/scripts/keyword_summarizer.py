@@ -50,7 +50,8 @@ def format_articles(articles):
 
 def generate_summary(query, articles):
     """Call Gemini to generate the summary."""
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    from newsfeed.config import DEFAULT_MODEL
+    model = genai.GenerativeModel(DEFAULT_MODEL)
     prompt = PROMPT_TEMPLATE.format(
         count=len(articles),
         query=query,

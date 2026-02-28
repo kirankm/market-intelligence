@@ -1,16 +1,19 @@
 """Cost tracking for LLM API usage."""
+from newsfeed.config import DEFAULT_MODEL
 
-# Gemini 2.5 Flash pricing (per 1M tokens)
+# Pricing per 1M tokens
 PRICING = {
     "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
     "gemini-2.5-pro":   {"input": 1.25, "output": 10.00},
     "gemini-3-flash":   {"input": 0.50, "output": 3.00},
+    "gemma-3-27b-it":   {"input": 0.00, "output": 0.00},  # free tier
 }
 
-_daily_usage = {"input_tokens": 0, "output_tokens": 0, "model": "gemini-2.5-flash"}
+_daily_usage = {"input_tokens": 0, "output_tokens": 0, "model": DEFAULT_MODEL}
 
-def track_usage(input_tokens: int, output_tokens: int, model: str = "gemini-2.5-flash"):
+def track_usage(input_tokens: int, output_tokens: int, model: str = None):
     """Add token counts to daily running total."""
+    if model is None: model = DEFAULT_MODEL
     _daily_usage["input_tokens"] += input_tokens
     _daily_usage["output_tokens"] += output_tokens
     _daily_usage["model"] = model
@@ -18,7 +21,7 @@ def track_usage(input_tokens: int, output_tokens: int, model: str = "gemini-2.5-
 def get_daily_cost() -> dict:
     """Calculate cost for today's usage."""
     model = _daily_usage["model"]
-    prices = PRICING.get(model, PRICING["gemini-2.5-flash"])
+    prices = PRICING.get(model, PRICING[DEFAULT_MODEL])
     input_cost = (_daily_usage["input_tokens"] / 1_000_000) * prices["input"]
     output_cost = (_daily_usage["output_tokens"] / 1_000_000) * prices["output"]
     return {

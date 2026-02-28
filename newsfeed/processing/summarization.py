@@ -91,9 +91,11 @@ def _get_client():
 
 # ── Summarize with Retry ───────────────────────────────────
 
-def summarize(text: str, url: str = "", model: str = "gemini-2.5-flash",
+def summarize(text: str, url: str = "", model: str = None,
               max_retries: int = 3, retry_delay: float = 2.0) -> dict:
     """Generate subtitle + bullet summary with retry logic."""
+    from newsfeed.config import DEFAULT_MODEL
+    if model is None: model = DEFAULT_MODEL
     client = _get_client()
 
     for attempt in range(1, max_retries + 1):

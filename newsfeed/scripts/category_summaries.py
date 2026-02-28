@@ -75,7 +75,9 @@ Articles:
 
 def generate_summary(tag_name: str, articles: list[Article],
                      date_from: date, date_to: date,
-                     model: str = "gemini-2.5-flash") -> str:
+                     model: str = None) -> str:
+    from newsfeed.config import DEFAULT_MODEL
+    if model is None: model = DEFAULT_MODEL
     article_text = "\n\n".join(
         f"- {a.title} ({a.date}): {a.content[:500] if a.content else ''}"
         for a in articles
