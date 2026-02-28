@@ -47,5 +47,5 @@ from newsfeed.web.queries.digests import (
 from newsfeed.web.queries.admin import (
     JOBS, get_all_sources, toggle_source_active,
     get_cost_by_source, get_cost_totals,
-    get_job_status, set_job_running, run_job_background, set_job_complete
+    get_job_status, set_job_running, set_job_complete
 )

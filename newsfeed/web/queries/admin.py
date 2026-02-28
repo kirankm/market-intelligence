@@ -1,7 +1,5 @@
 """Admin queries — jobs, sources, costs."""
 
-import subprocess
-import sys
 from datetime import datetime
 
 from sqlalchemy import func as sqla_func
@@ -10,18 +8,18 @@ from newsfeed.web.queries.settings import get_setting, upsert_setting
 
 JOBS = [
     {'key': 'pipeline', 'name': 'Pipeline Run', 'desc': 'Fetch articles from all sources',
-     'cmd': [sys.executable, '-m', 'newsfeed.run'],
+     'endpoint': '/run-pipeline',
      'params': [
-         {'name': 'from_date', 'label': 'From Date', 'placeholder': 'YYYY-MM-DD', 'arg': '--from'},
-         {'name': 'to_date', 'label': 'To Date', 'placeholder': 'YYYY-MM-DD', 'arg': '--to'},
-         {'name': 'max_pages', 'label': 'Max Pages', 'placeholder': '5', 'arg': '--max-pages'},
+         {'name': 'from_date', 'label': 'From Date', 'placeholder': 'YYYY-MM-DD'},
+         {'name': 'to_date', 'label': 'To Date', 'placeholder': 'YYYY-MM-DD'},
+         {'name': 'max_pages', 'label': 'Max Pages', 'placeholder': '5'},
      ]},
     {'key': 'category_summarizer', 'name': 'Category Summarizer', 'desc': 'Generate category summaries',
-     'cmd': [sys.executable, '-m', 'newsfeed.scripts.category_summaries']},
+     'endpoint': '/run-category-summaries'},
     {'key': 'digest_creator', 'name': 'Digest Creator', 'desc': 'Create weekly digest from starred articles',
-     'cmd': [sys.executable, '-m', 'newsfeed.scripts.create_digest']},
+     'endpoint': '/run-digest'},
     {'key': 'keyword_summarizer', 'name': 'Keyword Summarizer', 'desc': 'Process pending keyword summaries',
-     'cmd': [sys.executable, '-m', 'newsfeed.web.scripts.keyword_summarizer', '--once']},
+     'endpoint': '/process-pending-keywords'},
 ]
 
 
@@ -83,19 +81,6 @@ def get_job_status(db, job_key):
 def set_job_running(db, job_key):
     """Mark a job as running."""
     upsert_setting(db, f'job_{job_key}_status', 'running')
-
-
-def run_job_background(job_key, cmd, params=None):
-    """Spawn a job in the background with optional params."""
-    full_cmd = list(cmd)
-    if params:
-        job = next((j for j in JOBS if j['key'] == job_key), None)
-        if job:
-            for p in job.get('params', []):
-                val = params.get(p['name'], '').strip()
-                if val:
-                    full_cmd.extend([p['arg'], val])
-    subprocess.Popen(full_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def set_job_complete(db, job_key, success=True, error=''):

@@ -376,7 +376,7 @@ def job_params_form(job):
     if not params: return None
     inputs = [DivLAligned(
         Span(p['label'] + ":", cls="text-xs text-muted-foreground w-20"),
-        Input(type="text", name=p['name'], placeholder=p['placeholder'],
+        Input(type="text", name=p['name'], placeholder=p.get('placeholder', ''),
               cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground w-32"),
         cls="gap-2"
     ) for p in params]

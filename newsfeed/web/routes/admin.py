@@ -14,7 +14,7 @@ from newsfeed.web.queries.feed import (
     create_user, update_user_role, delete_user,
     get_all_sources, toggle_source_active,
     get_cost_by_source, get_cost_totals,
-    JOBS, get_job_status, set_job_running, run_job_background
+    JOBS, get_job_status, set_job_running
 )
 from newsfeed.web.filters import date_range
 
@@ -44,9 +44,18 @@ def tab_content(db, tab, **kwargs):
         return jobs_table(JOBS, lambda key: get_job_status(db, key))
     return P("Unknown tab", cls=TEXT_EMPTY)
 
-def admin_content(db, tab='settings', **kwargs):
+def admin_content(db, tab='settings', trigger_endpoint=None, **kwargs):
     """Ribbon + tab content — HTMX target."""
-    return Div(admin_ribbon(tab), tab_content(db, tab, **kwargs), id="admin-content")
+    content = Div(admin_ribbon(tab), tab_content(db, tab, **kwargs), id="admin-content")
+    if trigger_endpoint:
+        # Fire off the job endpoint via HTMX after rendering
+        content = Div(
+            admin_ribbon(tab),
+            tab_content(db, tab, **kwargs),
+            Div(hx_get=trigger_endpoint, hx_trigger="load", hx_swap="none"),
+            id="admin-content"
+        )
+    return content
 
 def admin_page(session, db, tab='settings'):
     """Render admin dashboard."""
@@ -137,6 +146,10 @@ def post(job_key: str, session, request, from_date: str = '', to_date: str = '',
     job = next((j for j in JOBS if j['key'] == job_key), None)
     if not job: return admin_content(db, 'jobs')
     set_job_running(db, job_key)
-    params = {'from_date': from_date, 'to_date': to_date, 'max_pages': max_pages}
-    run_job_background(job_key, job['cmd'], params)
-    return admin_content(db, 'jobs')
+    # Build the endpoint URL with any params
+    endpoint = job['endpoint']
+    params = {k: v for k, v in {'from_date': from_date, 'to_date': to_date, 'max_pages': max_pages}.items() if v.strip()}
+    if params:
+        from urllib.parse import urlencode
+        endpoint = f"{endpoint}?{urlencode(params)}"
+    return admin_content(db, 'jobs', trigger_endpoint=endpoint)
