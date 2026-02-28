@@ -1,0 +1,15 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/mi-app-kiran/mi-repo/newsfeed:latest', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/mi-app-kiran/mi-repo/newsfeed:latest']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'newsfeed'
+      - '--image=us-central1-docker.pkg.dev/mi-app-kiran/mi-repo/newsfeed:latest'
+      - '--region=us-central1'
+    entrypoint: 'gcloud'
+images:
+  - 'us-central1-docker.pkg.dev/mi-app-kiran/mi-repo/newsfeed:latest'
