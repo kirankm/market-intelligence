@@ -59,16 +59,78 @@ def tag_pill(name):
     return Span(name, cls="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full")
 
 
+def tag_display(article_id, tags):
+    """Render tags with an edit button — swappable via HTMX."""
+    pills = [tag_pill(t) for t in tags]
+    return Div(
+        *pills,
+        Span("✏️", cls="text-xs cursor-pointer hover:scale-110 transition ml-1",
+             hx_get=f"/feed/article/{article_id}/tags/edit",
+             hx_target=f"#tags-{article_id}",
+             hx_swap="outerHTML",
+             title="Edit tags"),
+        id=f"tags-{article_id}",
+        cls="flex gap-1.5 flex-wrap items-center"
+    )
+
+
+def tag_editor(article_id, current_tags, all_tags):
+    """Render inline tag editor with add/remove controls."""
+    # Current tags with remove buttons
+    current_pills = [
+        Span(
+            t, " ✕",
+            cls="text-xs px-2 py-0.5 bg-destructive/10 text-destructive rounded-full cursor-pointer hover:bg-destructive/20",
+            hx_post=f"/feed/article/{article_id}/tags/remove?tag_name={t}",
+            hx_target=f"#tags-{article_id}",
+            hx_swap="outerHTML",
+            title=f"Remove {t}"
+        ) for t in current_tags
+    ]
+
+    # Available tags (not already applied)
+    available = [t for t in all_tags if t not in current_tags]
+
+    # Dropdown + add button
+    tag_options = [Option(t, value=t) for t in available]
+    add_form = Form(
+        Select(*tag_options, name="tag_name", id=f"tag-select-{article_id}",
+               cls="text-xs px-1 py-0.5 rounded border",
+               onchange=f"document.getElementById('free-text-{article_id}').style.display = this.value === 'Other' ? 'inline' : 'none'"),
+        Input(type="text", name="free_text", placeholder="Enter tag...",
+              id=f"free-text-{article_id}",
+              cls="text-xs px-1 py-0.5 rounded border ml-1",
+              style="display:none"),
+        Button("Add", type="submit",
+               cls="text-xs px-2 py-0.5 bg-primary text-primary-foreground rounded ml-1"),
+        hx_post=f"/feed/article/{article_id}/tags/add",
+        hx_target=f"#tags-{article_id}",
+        hx_swap="outerHTML",
+        cls="flex items-center"
+    )
+
+    done_btn = Span("✓ Done", cls="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded cursor-pointer hover:bg-muted/80 ml-2",
+                    hx_get=f"/feed/article/{article_id}/tags/done",
+                    hx_target=f"#tags-{article_id}",
+                    hx_swap="outerHTML")
+
+    return Div(
+        Div(*current_pills, cls="flex gap-1.5 flex-wrap mb-1"),
+        Div(add_form, done_btn, cls="flex items-center"),
+        id=f"tags-{article_id}",
+        cls="flex flex-col gap-1 p-2 bg-muted/30 rounded"
+    )
+
+
 def card_meta(article, source_name, tags):
     """Render date, source, and tags row."""
     date_str = article.date.strftime("%d %b %Y") if article.date else "No date"
-    pills = [tag_pill(t) for t in tags]
     return DivLAligned(
         Span(date_str, cls="text-xs text-muted-foreground"),
         Span("•", cls="text-xs text-muted-foreground"),
         Span(source_name, cls="text-xs text-muted-foreground"),
-        Span("•", cls="text-xs text-muted-foreground") if pills else None,
-        *pills,
+        Span("•", cls="text-xs text-muted-foreground") if tags else None,
+        tag_display(article.id, tags),
         cls="gap-1.5 flex-wrap mt-0.5"
     )
 

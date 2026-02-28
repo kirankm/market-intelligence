@@ -4,14 +4,16 @@ from fasthtml.core import APIRouter
 from newsfeed.web.components.nav import navbar
 from newsfeed.web.components.cards import (
     article_card, expanded_card, star_icon, tag_filter, source_filter, date_filter,
-    search_box, load_more_sentinel
+    search_box, load_more_sentinel, tag_editor, tag_display
 )
 from newsfeed.web.queries.feed import (
     get_articles, get_article, get_latest_summary,
     article_tags, is_starred, toggle_star,
-    get_tags_with_counts, get_sources_with_counts, get_setting, search_articles
+    get_tags_with_counts, get_sources_with_counts, get_setting, search_articles,
+    get_all_tags, add_tag_to_article, remove_tag_from_article
 )
 from newsfeed.web.filters import FilterState, date_range
+from newsfeed.storage.models import Article
 
 ar = APIRouter()
 
@@ -125,3 +127,42 @@ def get(session, request, tags: str = '', source: str = '', date: str = '',
     if len(articles) == page_size:
         cards.append(load_more_sentinel(state, offset + page_size, page_size))
     return Div(*cards)
+
+@ar('/feed/article/{article_id}/tags/edit')
+def get(article_id: int, request):
+    """Show tag editor for an article."""
+    db = request.state.db
+    current_tags = article_tags(db.query(Article).get(article_id))
+    all_tags = get_all_tags(db)
+    return tag_editor(article_id, current_tags, all_tags)
+
+@ar('/feed/article/{article_id}/tags/add')
+def post(article_id: int, session, request, tag_name: str = '', free_text: str = ''):
+    """Add a tag to an article."""
+    db = request.state.db
+    user_id = session.get('user_id')
+    name = free_text.strip() if tag_name == 'Other' and free_text.strip() else tag_name
+    if name:
+        add_tag_to_article(db, article_id, name, user_id)
+    current_tags = article_tags(db.query(Article).get(article_id))
+    all_tags = get_all_tags(db)
+    return tag_editor(article_id, current_tags, all_tags)
+
+@ar('/feed/article/{article_id}/tags/remove')
+def post(article_id: int, session, request, tag_name: str = ''):
+    """Remove a tag from an article."""
+    db = request.state.db
+    user_id = session.get('user_id')
+    if tag_name:
+        remove_tag_from_article(db, article_id, tag_name, user_id)
+    current_tags = article_tags(db.query(Article).get(article_id))
+    all_tags = get_all_tags(db)
+    return tag_editor(article_id, current_tags, all_tags)
+
+@ar('/feed/article/{article_id}/tags/done')
+def get(article_id: int, request):
+    """Close tag editor, return normal tag display."""
+    db = request.state.db
+    article = get_article(db, article_id)
+    current_tags = article_tags(article)
+    return tag_display(article_id, current_tags)

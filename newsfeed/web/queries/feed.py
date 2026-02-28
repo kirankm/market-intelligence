@@ -10,7 +10,7 @@ from newsfeed.storage.models import AppSetting, Source
 from newsfeed.storage.models import ArticleSummary, CategorySummary
 from datetime import datetime
 from newsfeed.storage.models import Digest, DigestItem, DigestSummary, KeywordSummary
-from newsfeed.storage.models import User, Role, UserRole, PipelineRun
+from newsfeed.storage.models import User, Role, UserRole, PipelineRun, TagEdit
 
 JOBS = {'key': 'pipeline', 'name': 'Pipeline Run', 'desc': 'Fetch articles from all sources',
  'cmd': [sys.executable, '-m', 'newsfeed.run'],
@@ -470,3 +470,62 @@ def set_job_complete(db, job_key, success=True, error=''):
     upsert_setting(db, f'job_{job_key}_last_run', datetime.now().strftime('%b %d, %H:%M'))
     upsert_setting(db, f'job_{job_key}_result', error if not success else '')
 
+
+def get_all_tags(db):
+    """Get all tag names sorted alphabetically, plus 'Other'."""
+    tags = db.query(Tag).order_by(Tag.name).all()
+    names = [t.name for t in tags]
+    if 'Other' not in names:
+        names.append('Other')
+    return names
+
+
+def add_tag_to_article(db, article_id, tag_name, user_id=None):
+    """Add a tag to an article and log the edit."""
+    # Get or create the tag
+    tag = db.query(Tag).filter(Tag.name == tag_name).first()
+    if not tag:
+        tag = Tag(name=tag_name)
+        db.add(tag)
+        db.flush()
+
+    # Check if already exists (including soft-removed)
+    existing = (db.query(ArticleTag)
+                .filter(ArticleTag.article_id == article_id,
+                        ArticleTag.tag_id == tag.id)
+                .first())
+    if existing:
+        if existing.removed:
+            existing.removed = False
+            existing.removed_by = None
+            existing.added_by = user_id
+            existing.is_auto = False
+    else:
+        db.add(ArticleTag(
+            article_id=article_id, tag_id=tag.id,
+            is_auto=False, added_by=user_id
+        ))
+
+    # Log the edit
+    db.add(TagEdit(article_id=article_id, tag_id=tag.id, action='add', user_id=user_id))
+    db.commit()
+
+
+def remove_tag_from_article(db, article_id, tag_name, user_id=None):
+    """Soft-remove a tag from an article and log the edit."""
+    tag = db.query(Tag).filter(Tag.name == tag_name).first()
+    if not tag:
+        return
+
+    existing = (db.query(ArticleTag)
+                .filter(ArticleTag.article_id == article_id,
+                        ArticleTag.tag_id == tag.id,
+                        ArticleTag.removed == False)
+                .first())
+    if existing:
+        existing.removed = True
+        existing.removed_by = user_id
+
+    # Log the edit
+    db.add(TagEdit(article_id=article_id, tag_id=tag.id, action='remove', user_id=user_id))
+    db.commit()

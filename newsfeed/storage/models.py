@@ -142,6 +142,28 @@ class ArticleTag(Base):
         Index("idx_article_tags_tag", "tag_id"),
     )
 
+# ── Tag Edits (audit log for training) ──────────────────────
+
+class TagEdit(Base):
+    __tablename__ = "tag_edits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="RESTRICT"), nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)  # 'add' or 'remove'
+    free_text: Mapped[Optional[str]] = mapped_column(Text)  # for "Other" tags
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    article: Mapped["Article"] = relationship()
+    tag: Mapped["Tag"] = relationship()
+
+    __table_args__ = (
+        CheckConstraint("action IN ('add', 'remove')", name="ck_tag_edits_action"),
+        Index("idx_tag_edits_article", "article_id"),
+        Index("idx_tag_edits_user", "user_id"),
+    )
+
 # ── Stars ───────────────────────────────────────────────────
 
 class ArticleStar(Base):
