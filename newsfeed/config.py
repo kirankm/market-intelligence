@@ -1,5 +1,6 @@
 # ── AI Model ────────────────────────────────────────────────
 DEFAULT_MODEL = "gemma-3-27b-it"
+MODELS_WITH_JSON_MODE = {"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

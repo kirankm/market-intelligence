@@ -1,6 +1,6 @@
 """AI summarization using Gemini with retry + failure tracking."""
 
-import os, json, time, logging
+import os, json, re, time, logging
 from pathlib import Path
 from google import genai
 from newsfeed.cost import track_usage
@@ -89,28 +89,47 @@ def _get_client():
         _client = genai.Client(api_key=api_key)
     return _client
 
+# ── JSON Extraction ─────────────────────────────────────────
+
+def extract_json(text: str) -> dict:
+    """Extract JSON from response text, handling markdown fences and extra text."""
+    # Strip markdown fences
+    cleaned = re.sub(r'```(?:json)?\s*', '', text).strip()
+    cleaned = re.sub(r'```\s*$', '', cleaned).strip()
+    # Try parsing directly
+    try: return json.loads(cleaned)
+    except json.JSONDecodeError: pass
+    # Fallback: find first { ... } block
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if match:
+        try: return json.loads(match.group())
+        except json.JSONDecodeError: pass
+    raise ValueError(f"Could not extract JSON from response: {text[:200]}")
+
 # ── Summarize with Retry ───────────────────────────────────
 
 def summarize(text: str, url: str = "", model: str = None,
               max_retries: int = 3, retry_delay: float = 2.0) -> dict:
     """Generate subtitle + bullet summary with retry logic."""
-    from newsfeed.config import DEFAULT_MODEL
+    from newsfeed.config import DEFAULT_MODEL, MODELS_WITH_JSON_MODE
     if model is None: model = DEFAULT_MODEL
     client = _get_client()
+    use_json_mode = model in MODELS_WITH_JSON_MODE
 
     for attempt in range(1, max_retries + 1):
         try:
+            config = {"response_mime_type": "application/json"} if use_json_mode else {}
             response = client.models.generate_content(
                 model=model,
                 contents=SUMMARY_PROMPT + text,
-                config={"response_mime_type": "application/json"},
+                config=config,
             )
             # Track cost
             usage = response.usage_metadata
             track_usage(usage.prompt_token_count, usage.candidates_token_count, model)
             log.info(f"Summarized ({usage.prompt_token_count} in, {usage.candidates_token_count} out tokens)")
 
-            result = json.loads(response.text)
+            result = extract_json(response.text) if not use_json_mode else json.loads(response.text)
 
             # Validate structure
             if "subtitle" not in result or "bullets" not in result:
