@@ -21,3 +21,13 @@ def run_pipeline(request):
         return JSONResponse({'status': 'success'})
     except Exception as e:
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
+
+@ar.get('/run-category-summaries')
+def run_category_summaries(request):
+    try:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+        from newsfeed.scripts.category_summaries import run
+        run()
+        return JSONResponse({'status': 'success'})
+    except Exception as e:
+        return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
