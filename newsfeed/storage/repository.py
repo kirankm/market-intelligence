@@ -30,9 +30,10 @@ def _get_or_create_tag(session, tag_name: str) -> Tag:
 
 # ── Core: Save One Article ──────────────────────────────────
 
-def save_article(article_dict: dict, source_name: str, source_url: str) -> bool:
+def save_article(article_dict: dict, source_name: str, source_url: str, db=None) -> bool:
     """Save a single processed article + summary + tags. Returns True on success."""
-    session = get_session()
+    owns_session = db is None
+    session = db or get_session()
     try:
         source = _get_or_create_source(session, source_name, source_url)
 
@@ -40,7 +41,6 @@ def save_article(article_dict: dict, source_name: str, source_url: str) -> bool:
         existing = session.query(Article).filter_by(url=article_dict["url"]).first()
         if existing:
             log.info(f"Skipping duplicate: {article_dict['url']}")
-            session.close()
             return True
 
         # Insert article
@@ -93,10 +93,13 @@ def save_article(article_dict: dict, source_name: str, source_url: str) -> bool:
         log.error(f"Failed to save {article_dict.get('url')}: {e}")
         return False
     finally:
-        session.close()
+        if owns_session:
+            session.close()
 
-def update_source_health(source_name: str, success: bool):
-    session = get_session()
+def update_source_health(source_name: str, success: bool, db=None):
+    """Update source last_success/last_failure timestamp."""
+    owns_session = db is None
+    session = db or get_session()
     try:
         source = session.query(Source).filter_by(name=source_name).first()
         if source:
@@ -106,11 +109,14 @@ def update_source_health(source_name: str, success: bool):
                 source.last_failure = datetime.now(timezone.utc)
             session.commit()
     finally:
-        session.close()
+        if owns_session:
+            session.close()
 
 
-def save_pipeline_run(source_name: str, articles_fetched: int, cost_data: dict):
-    session = get_session()
+def save_pipeline_run(source_name: str, articles_fetched: int, cost_data: dict, db=None):
+    """Save a pipeline run record with cost data."""
+    owns_session = db is None
+    session = db or get_session()
     try:
         source = session.query(Source).filter_by(name=source_name).first()
         if not source:
@@ -126,4 +132,5 @@ def save_pipeline_run(source_name: str, articles_fetched: int, cost_data: dict):
         session.commit()
         log.info(f"Saved pipeline run for {source_name}")
     finally:
-        session.close()
+        if owns_session:
+            session.close()
