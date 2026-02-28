@@ -14,8 +14,8 @@ _daily_usage = {"input_tokens": 0, "output_tokens": 0, "model": DEFAULT_MODEL}
 def track_usage(input_tokens: int, output_tokens: int, model: str = None):
     """Add token counts to daily running total."""
     if model is None: model = DEFAULT_MODEL
-    _daily_usage["input_tokens"] += input_tokens
-    _daily_usage["output_tokens"] += output_tokens
+    _daily_usage["input_tokens"] += input_tokens or 0
+    _daily_usage["output_tokens"] += output_tokens or 0
     _daily_usage["model"] = model
 
 def get_daily_cost() -> dict:
