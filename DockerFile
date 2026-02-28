@@ -6,6 +6,7 @@ COPY newsfeed/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY newsfeed/ ./newsfeed/
-COPY .env .
+COPY start.sh .
+RUN chmod +x start.sh
 
-CMD ["python", "-m", "newsfeed.run"]
+CMD ["./start.sh"]
