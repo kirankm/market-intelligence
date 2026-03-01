@@ -138,4 +138,4 @@ def summarize(text: str, url: str = "", model: str = None,
             else:
                 log.error(f"All {max_retries} attempts failed for: {url}")
                 log_failure(url, "summarize", str(e), max_retries)
-                return {"subtitle": "", "bullets": []}
+                return None

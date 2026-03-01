@@ -6,9 +6,8 @@ from newsfeed.storage.models import Article, ArticleSummary, ArticleTag, Tag
 from newsfeed.storage.repository import _get_or_create_tag
 from newsfeed.processing.summarization import summarize
 from newsfeed.processing.tagging import auto_tag
-from newsfeed.processing.extraction import extract_jina_meta, extract_body_by_markers, extract_body_by_heuristic
-from newsfeed.processing.cleanup import decode_entities, normalize_whitespace, strip_links, strip_images, strip_byline
-from newsfeed.processing.noise import remove_noise
+from newsfeed.processing import process_article
+from newsfeed.config import SiteConfig
 from newsfeed.fetch.client import jina_fetch
 import httpx
 
@@ -35,6 +34,12 @@ def get_articles_missing_tags(session):
             .all())
 
 
+CLEANING_PIPELINE = [
+    "extract_jina_meta", "remove_noise", "extract_body",
+    "strip_byline", "strip_links", "strip_images",
+    "decode_entities", "normalize_whitespace",
+]
+
 def refetch_content(article):
     """Re-fetch and clean content for an article missing content."""
     if not article.url:
@@ -46,15 +51,11 @@ def refetch_content(article):
         raw = jina_fetch(client, article.url)
         client.close()
 
-        # Extract and clean — same as processing pipeline
-        meta = extract_jina_meta(raw)
-        body = meta["body"]
-        body = remove_noise(body)
-        body = extract_body_by_heuristic(body) if body else ""
-        body = strip_links(body)
-        body = strip_images(body)
-        body = decode_entities(body)
-        body = normalize_whitespace(body)
+        # Use the processing pipeline (without summarize/auto_tag)
+        article_dict = {"content": raw, "url": article.url, "title": article.title or ""}
+        config = SiteConfig(name="backfill", listing_url="", pagination="")
+        processed = process_article(article_dict, config, pipeline=CLEANING_PIPELINE)
+        body = processed.get("content", "")
 
         log.info(f"Refetched content for article {article.id}: {len(body)} chars")
         return body
@@ -79,7 +80,7 @@ def backfill_summaries(session, articles):
         log.info(f"Backfilling summary for: {article.title[:60]}")
         result = summarize(article.content, url=article.url)
 
-        if not result.get("subtitle"):
+        if result is None or not result.get("subtitle"):
             log.warning(f"Still failed for article {article.id}")
             continue
 

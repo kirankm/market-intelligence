@@ -1,13 +1,14 @@
 """Background worker — processes pending keyword summaries via Gemini."""
-import time, logging
+import os, time, logging
 import newsfeed.env  # noqa: F401 — load .env once
-import google.generativeai as genai
+from google import genai
 from datetime import datetime
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import KeywordSummary, Article, ArticleSummary
 from sqlalchemy import desc, cast, String
 from newsfeed.web.queries.feed import search_articles
 from newsfeed.config import DEFAULT_MODEL
+from newsfeed.cost import track_usage
 
 log = logging.getLogger("newsfeed.keyword_summarizer")
 
@@ -19,24 +20,25 @@ Articles:
 {articles_text}
 """
 
+# ── Gemini Client ───────────────────────────────────────────
+
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not set in environment")
+        _client = genai.Client(api_key=api_key)
+    return _client
+
 
 def get_pending_summaries(db):
     """Fetch all pending keyword summary requests."""
     return (db.query(KeywordSummary)
             .filter(KeywordSummary.status == 'pending')
             .order_by(KeywordSummary.created_at)
-            .all())
-
-def get_matching_articles(db, query, limit=50):
-    """Fetch articles matching the search query."""
-    term = f"%{query}%"
-    return (db.query(Article)
-            .outerjoin(ArticleSummary)
-            .filter(Article.title.ilike(term) |
-                    ArticleSummary.subtitle.ilike(term) |
-                    cast(ArticleSummary.bullets, String).ilike(term))
-            .order_by(desc(Article.date))
-            .limit(limit)
             .all())
 
 def format_articles(articles):
@@ -48,15 +50,20 @@ def format_articles(articles):
     return '\n'.join(parts)
 
 
-def generate_summary(query, articles):
+def generate_summary(query, articles, model=None):
     """Call Gemini to generate the summary."""
-    model = genai.GenerativeModel(DEFAULT_MODEL)
+    if model is None: model = DEFAULT_MODEL
+    client = _get_client()
     prompt = PROMPT_TEMPLATE.format(
         count=len(articles),
         query=query,
         articles_text=format_articles(articles)
     )
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model=model, contents=prompt)
+    usage = response.usage_metadata
+    input_tok = getattr(usage, 'prompt_token_count', None) or 0
+    output_tok = getattr(usage, 'candidates_token_count', None) or 0
+    track_usage(input_tok, output_tok, model)
     return response.text
 
 

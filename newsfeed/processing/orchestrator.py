@@ -69,9 +69,13 @@ def _tool_strip_byline(article: dict, config: SiteConfig) -> dict:
 
 @register_tool("summarize")
 def _tool_summarize(article: dict, config) -> dict:
-    result = summarize(article.get("content", ""))
-    article["subtitle"] = result.get("subtitle", "")
-    article["bullets"] = result.get("bullets", [])
+    result = summarize(article.get("content", ""), url=article.get("url", ""))
+    if result is None:
+        log.warning(f"Summarization failed for: {article.get('url', 'unknown')}")
+        article["summary_failed"] = True
+    else:
+        article["subtitle"] = result.get("subtitle", "")
+        article["bullets"] = result.get("bullets", [])
     return article
 
 @register_tool("auto_tag")

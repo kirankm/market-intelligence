@@ -1,5 +1,8 @@
 """Cost tracking for LLM API usage."""
+import threading
 from newsfeed.config import DEFAULT_MODEL
+
+_lock = threading.Lock()
 
 # Pricing per 1M tokens
 PRICING = {
@@ -14,20 +17,24 @@ _daily_usage = {"input_tokens": 0, "output_tokens": 0, "model": DEFAULT_MODEL}
 def track_usage(input_tokens: int, output_tokens: int, model: str = None):
     """Add token counts to daily running total."""
     if model is None: model = DEFAULT_MODEL
-    _daily_usage["input_tokens"] += input_tokens or 0
-    _daily_usage["output_tokens"] += output_tokens or 0
-    _daily_usage["model"] = model
+    with _lock:
+        _daily_usage["input_tokens"] += input_tokens or 0
+        _daily_usage["output_tokens"] += output_tokens or 0
+        _daily_usage["model"] = model
 
 def get_daily_cost() -> dict:
     """Calculate cost for today's usage."""
-    model = _daily_usage["model"]
+    with _lock:
+        model = _daily_usage["model"]
+        input_tokens = _daily_usage["input_tokens"]
+        output_tokens = _daily_usage["output_tokens"]
     prices = PRICING.get(model, PRICING[DEFAULT_MODEL])
-    input_cost = (_daily_usage["input_tokens"] / 1_000_000) * prices["input"]
-    output_cost = (_daily_usage["output_tokens"] / 1_000_000) * prices["output"]
+    input_cost = (input_tokens / 1_000_000) * prices["input"]
+    output_cost = (output_tokens / 1_000_000) * prices["output"]
     return {
         "model": model,
-        "input_tokens": _daily_usage["input_tokens"],
-        "output_tokens": _daily_usage["output_tokens"],
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
         "input_cost": round(input_cost, 6),
         "output_cost": round(output_cost, 6),
         "total_cost": round(input_cost + output_cost, 6),
@@ -35,5 +42,6 @@ def get_daily_cost() -> dict:
 
 def reset_daily_usage():
     """Reset counters (call at start of each run)."""
-    _daily_usage["input_tokens"] = 0
-    _daily_usage["output_tokens"] = 0
+    with _lock:
+        _daily_usage["input_tokens"] = 0
+        _daily_usage["output_tokens"] = 0

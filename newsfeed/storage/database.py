@@ -1,6 +1,7 @@
 """Database engine and session setup."""
 
 import os
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -24,6 +25,19 @@ def get_session():
     if _SessionFactory is None:
        _SessionFactory = sessionmaker(bind=get_engine())
     return _SessionFactory()
+
+@contextmanager
+def session_scope():
+    """Context manager that commits on success, rolls back on error, and always closes."""
+    session = get_session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 def init_db():
     """Create all tables."""

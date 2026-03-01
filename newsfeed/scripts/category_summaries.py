@@ -73,12 +73,24 @@ Articles:
 {articles}
 """
 
+def truncate_to_sentence(text: str, max_chars: int = 500) -> str:
+    """Truncate text at the nearest sentence boundary before max_chars."""
+    if not text or len(text) <= max_chars:
+        return text or ""
+    truncated = text[:max_chars]
+    # Find the last sentence-ending punctuation
+    for sep in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+        idx = truncated.rfind(sep)
+        if idx > max_chars // 3:  # don't cut too short
+            return truncated[:idx + 1]
+    return truncated.rsplit(' ', 1)[0] + '…'
+
 def generate_summary(tag_name: str, articles: list[Article],
                      date_from: date, date_to: date,
                      model: str = None) -> str:
     if model is None: model = DEFAULT_MODEL
     article_text = "\n\n".join(
-        f"- {a.title} ({a.date}): {a.content[:500] if a.content else ''}"
+        f"- {a.title} ({a.date}): {truncate_to_sentence(a.content)}"
         for a in articles
     )
     prompt = CATEGORY_PROMPT.format(
