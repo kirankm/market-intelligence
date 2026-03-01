@@ -1,4 +1,5 @@
 """Executive dashboard routes."""
+from datetime import date as date_type
 from fasthtml.common import *
 from fasthtml.core import APIRouter
 
@@ -8,8 +9,9 @@ from newsfeed.web.filters import FilterState, date_range
 from newsfeed.web.components.cards import (
     collapsible_section, article_card, tag_filter, source_filter,
     date_filter, category_period_dropdown, category_card,
-    digest_ribbon, digest_item, digest_expanded,
-    digest_summary_display, digest_summary_edit_form,
+    newsletter_ribbon, newsletter_date_range_form,
+    newsletter_item, newsletter_expanded,
+    newsletter_summary_display, newsletter_summary_edit_form,
     exec_search_box, exec_search_results, keyword_summaries_list,
     category_ribbon, category_tab, keyword_summary_item
 )
@@ -18,9 +20,9 @@ from newsfeed.web.queries.feed import (
     get_setting, article_tags, is_starred, get_starred_tags_with_counts,
     get_starred_sources_with_counts, get_category_summaries,
     get_category_article_counts, get_category_star_counts,
-    get_available_summary_periods, get_digests,
-    publish_digest, unpublish_digest, get_latest_digest_summary,
-    get_original_digest_summary, create_digest_summary_version,
+    get_available_summary_periods, get_newsletters,
+    publish_newsletter, unpublish_newsletter, get_latest_newsletter_summary,
+    get_original_newsletter_summary, create_newsletter_summary_version,
     search_articles, create_keyword_summary, get_keyword_summary,
     get_recent_keyword_summaries, delete_keyword_summary
 )
@@ -109,19 +111,20 @@ def section_starred(db, user_id):
     state = FilterState(base='/executive/starred', target='starred-content')
     return starred_content(db, user_id, state)
 
-def section_digests(db, active_tab='draft'):
-    """Recent digests section with ribbon tabs."""
-    drafts = get_digests(db, 'draft')
-    sent = get_digests(db, 'sent')
+def section_newsletters(db, active_tab='draft'):
+    """Newsletters section with ribbon tabs and date range form."""
+    drafts = get_newsletters(db, 'draft')
+    sent = get_newsletters(db, 'sent')
     items = drafts if active_tab == 'draft' else sent
     show_publish = active_tab == 'draft'
-    digest_cards = [digest_item(d, count, show_publish) for d, count in items]
-    if not digest_cards:
-        digest_cards = [P("No digests", cls=TEXT_EMPTY)]
+    newsletter_cards = [newsletter_item(d, count, show_publish) for d, count in items]
+    if not newsletter_cards:
+        newsletter_cards = [P("No newsletters", cls=TEXT_EMPTY)]
     return Div(
-        digest_ribbon(len(drafts), len(sent), active_tab),
-        *digest_cards,
-        id="digests-content"
+        newsletter_date_range_form(),
+        newsletter_ribbon(len(drafts), len(sent), active_tab),
+        *newsletter_cards,
+        id="newsletters-content"
     )
 
 def executive_page(session, db):
@@ -135,8 +138,8 @@ def executive_page(session, db):
                                 "search", open=False),
             collapsible_section("Starred by Team", section_starred(db, user_id),
                                 "starred", open=False),
-            collapsible_section("Recent Digests", section_digests(db),
-                                "digests", open=False),
+            collapsible_section("Newsletters", section_newsletters(db),
+                                "newsletters", open=False),
             cls=PAGE_PADDING
         ),
         cls=PAGE
@@ -156,7 +159,7 @@ def get(section_id: str, session, request, open: str = '1'):
         'categories': ("Category Summaries", section_category_summaries(db)),
         'search':     ("Keyword Search", section_keyword_search(db, user_id=user_id)),
         'starred':    ("Starred by Team", section_starred(db, user_id)),
-        'digests':    ("Recent Digests", section_digests(db)),
+        'newsletters': ("Newsletters", section_newsletters(db)),
     }
     title, content = sections.get(section_id, ("Unknown", P("Not found")))
     return collapsible_section(title, content, section_id, open=is_open)
@@ -176,78 +179,97 @@ def get(session, request, period: str = '', category: str = ''):
     period_from, period_to = None, None
     if period and '|' in period:
         parts = period.split('|')
-        from datetime import date
-        period_from = date.fromisoformat(parts[0])
-        period_to = date.fromisoformat(parts[1])
+        period_from = date_type.fromisoformat(parts[0])
+        period_to = date_type.fromisoformat(parts[1])
     return section_category_summaries(db, period_from, period_to, active_category=category or None)
 
-@ar('/executive/digests')
+@ar('/executive/newsletters')
 def get(session, request, tab: str = 'draft'):
     db = request.state.db
-    return section_digests(db, tab)
+    return section_newsletters(db, tab)
 
-@ar('/executive/digests/{digest_id}/expand')
-def get(digest_id: int, session, request, tab: str = 'draft'):
+@ar('/executive/newsletters/generate')
+def post(session, request, from_date: str = '', to_date: str = ''):
+    """Generate a newsletter for the given date range."""
     db = request.state.db
-    digests = get_digests(db, tab)
-    digest_match = [(d, c) for d, c in digests if d.id == digest_id]
-    if not digest_match: return P("Not found")
-    digest, count = digest_match[0]
-    summary = get_latest_digest_summary(db, digest_id)
-    return digest_expanded(digest, count, summary, show_publish=(tab == 'draft'))
+    try:
+        if not from_date or not to_date:
+            return Div(P("Please select both From and To dates", cls=TEXT_ERROR),
+                       section_newsletters(db))
+        d_from = date_type.fromisoformat(from_date)
+        d_to = date_type.fromisoformat(to_date)
+        from newsfeed.scripts.create_newsletter import create_newsletter
+        result = create_newsletter(db, d_from, d_to)
+        if not result:
+            return Div(P("Newsletter already exists for this range or no starred articles found",
+                        cls=TEXT_ERROR),
+                       section_newsletters(db))
+        return section_newsletters(db)
+    except Exception as e:
+        return Div(P(f"Error: {e}", cls=TEXT_ERROR), section_newsletters(db))
 
-@ar('/executive/digests/{digest_id}/collapse')
-def get(digest_id: int, session, request, tab: str = 'draft'):
+@ar('/executive/newsletters/{newsletter_id}/expand')
+def get(newsletter_id: int, session, request, tab: str = 'draft'):
     db = request.state.db
-    digests = get_digests(db, tab)
-    digest_match = [(d, c) for d, c in digests if d.id == digest_id]
-    if not digest_match: return P("Not found")
-    digest, count = digest_match[0]
-    return digest_item(digest, count, show_publish=(tab == 'draft'))
+    newsletters = get_newsletters(db, tab)
+    match = [(d, c) for d, c in newsletters if d.id == newsletter_id]
+    if not match: return P("Not found")
+    newsletter, count = match[0]
+    summary = get_latest_newsletter_summary(db, newsletter_id)
+    return newsletter_expanded(newsletter, count, summary, show_publish=(tab == 'draft'))
 
-
-@ar('/executive/digests/{digest_id}/publish')
-def post(digest_id: int, session, request):
+@ar('/executive/newsletters/{newsletter_id}/collapse')
+def get(newsletter_id: int, session, request, tab: str = 'draft'):
     db = request.state.db
-    publish_digest(db, digest_id)
-    return section_digests(db, 'sent')
+    newsletters = get_newsletters(db, tab)
+    match = [(d, c) for d, c in newsletters if d.id == newsletter_id]
+    if not match: return P("Not found")
+    newsletter, count = match[0]
+    return newsletter_item(newsletter, count, show_publish=(tab == 'draft'))
 
-@ar('/executive/digests/{digest_id}/review')
-def post(digest_id: int, session, request):
+
+@ar('/executive/newsletters/{newsletter_id}/publish')
+def post(newsletter_id: int, session, request):
     db = request.state.db
-    unpublish_digest(db, digest_id)
-    return section_digests(db, 'draft')
+    publish_newsletter(db, newsletter_id)
+    return section_newsletters(db, 'sent')
 
-@ar('/executive/digests/{digest_id}/edit')
-def get(digest_id: int, session, request):
+@ar('/executive/newsletters/{newsletter_id}/review')
+def post(newsletter_id: int, session, request):
     db = request.state.db
-    summary = get_latest_digest_summary(db, digest_id)
-    return digest_summary_edit_form(digest_id, summary)
+    unpublish_newsletter(db, newsletter_id)
+    return section_newsletters(db, 'draft')
+
+@ar('/executive/newsletters/{newsletter_id}/edit')
+def get(newsletter_id: int, session, request):
+    db = request.state.db
+    summary = get_latest_newsletter_summary(db, newsletter_id)
+    return newsletter_summary_edit_form(newsletter_id, summary)
 
 
-@ar('/executive/digests/{digest_id}/save')
-def post(digest_id: int, session, request, content: str = ''):
+@ar('/executive/newsletters/{newsletter_id}/save')
+def post(newsletter_id: int, session, request, content: str = ''):
     db = request.state.db
     user_id = session.get('user_id')
-    summary = create_digest_summary_version(db, digest_id, content, user_id)
-    return digest_summary_display(digest_id, summary, show_edit=True)
+    summary = create_newsletter_summary_version(db, newsletter_id, content, user_id)
+    return newsletter_summary_display(newsletter_id, summary, show_edit=True)
 
 
-@ar('/executive/digests/{digest_id}/revert')
-def post(digest_id: int, session, request):
+@ar('/executive/newsletters/{newsletter_id}/revert')
+def post(newsletter_id: int, session, request):
     db = request.state.db
     user_id = session.get('user_id')
-    original = get_original_digest_summary(db, digest_id)
+    original = get_original_newsletter_summary(db, newsletter_id)
     if not original: return P("No original found", cls=TEXT_ERROR)
-    summary = create_digest_summary_version(db, digest_id, original.content, user_id)
-    return digest_summary_display(digest_id, summary, show_edit=True)
+    summary = create_newsletter_summary_version(db, newsletter_id, original.content, user_id)
+    return newsletter_summary_display(newsletter_id, summary, show_edit=True)
 
 
-@ar('/executive/digests/{digest_id}/cancel')
-def get(digest_id: int, session, request):
+@ar('/executive/newsletters/{newsletter_id}/cancel')
+def get(newsletter_id: int, session, request):
     db = request.state.db
-    summary = get_latest_digest_summary(db, digest_id)
-    return digest_summary_display(digest_id, summary, show_edit=True)
+    summary = get_latest_newsletter_summary(db, newsletter_id)
+    return newsletter_summary_display(newsletter_id, summary, show_edit=True)
 
 @ar('/executive/search')
 def get(session, request, search: str = ''):
@@ -279,9 +301,8 @@ def get(session, request, category: str = '', period: str = ''):
     period_from, period_to = None, None
     if period and '|' in period:
         parts = period.split('|')
-        from datetime import date
-        period_from = date.fromisoformat(parts[0])
-        period_to = date.fromisoformat(parts[1])
+        period_from = date_type.fromisoformat(parts[0])
+        period_to = date_type.fromisoformat(parts[1])
     return section_category_summaries(db, period_from, period_to, active_category=category)
 
 @ar('/executive/search/summary/{summary_id}/toggle')
@@ -298,5 +319,3 @@ def delete(summary_id: int, session, request):
     delete_keyword_summary(db, summary_id)
     summaries = get_recent_keyword_summaries(db, user_id)
     return keyword_summaries_list(summaries)
-
-

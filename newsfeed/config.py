@@ -2,6 +2,14 @@
 DEFAULT_MODEL = "gemma-3-27b-it"
 MODELS_WITH_JSON_MODE = {"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
 
+MODEL_TOKEN_LIMITS = {
+    "gemma-3-27b-it": 8192,
+    "gemini-2.5-flash": 1048576,
+    "gemini-2.0-flash": 1048576,
+    "gemini-1.5-flash": 1048576,
+    "gemini-1.5-pro": 2097152,
+}
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional

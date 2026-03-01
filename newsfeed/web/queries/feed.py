@@ -5,7 +5,7 @@ All query functions have been split into focused modules:
   - tags.py      — tag counts, edits, add/remove
   - settings.py  — app settings CRUD
   - users.py     — user/role CRUD
-  - digests.py   — digests, category summaries, keyword summaries
+  - digests.py   — newsletters, category summaries, keyword summaries
   - admin.py     — jobs, sources, costs
 """
 
@@ -33,13 +33,14 @@ from newsfeed.web.queries.users import (
     create_user, update_user_role, delete_user
 )
 
-# Digests & Category Summaries
+# Newsletters & Category Summaries
 from newsfeed.web.queries.digests import (
     get_category_summaries, get_category_article_counts,
     get_category_star_counts, get_available_summary_periods,
-    get_digests, get_digest_articles, publish_digest, unpublish_digest,
-    get_latest_digest_summary, get_original_digest_summary,
-    create_digest_summary_version, create_keyword_summary,
+    get_newsletters, get_newsletter_articles,
+    publish_newsletter, unpublish_newsletter,
+    get_latest_newsletter_summary, get_original_newsletter_summary,
+    create_newsletter_summary_version, create_keyword_summary,
     get_keyword_summary, get_recent_keyword_summaries, delete_keyword_summary
 )
 

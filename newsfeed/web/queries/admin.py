@@ -16,8 +16,12 @@ JOBS = [
      ]},
     {'key': 'category_summarizer', 'name': 'Category Summarizer', 'desc': 'Generate category summaries',
      'endpoint': '/run-category-summaries'},
-    {'key': 'digest_creator', 'name': 'Digest Creator', 'desc': 'Create weekly digest from starred articles',
-     'endpoint': '/run-digest'},
+    {'key': 'newsletter_creator', 'name': 'Newsletter Creator', 'desc': 'Create newsletter from starred articles',
+     'endpoint': '/run-newsletter',
+     'params': [
+         {'name': 'from_date', 'label': 'From Date', 'placeholder': 'YYYY-MM-DD'},
+         {'name': 'to_date', 'label': 'To Date', 'placeholder': 'YYYY-MM-DD'},
+     ]},
     {'key': 'keyword_summarizer', 'name': 'Keyword Summarizer', 'desc': 'Process pending keyword summaries',
      'endpoint': '/process-pending-keywords'},
 ]

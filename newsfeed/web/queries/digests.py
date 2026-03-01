@@ -1,4 +1,4 @@
-"""Digest and category summary queries."""
+"""Newsletter and category summary queries."""
 
 from datetime import datetime
 from sqlalchemy import desc
@@ -52,8 +52,8 @@ def get_available_summary_periods(db):
             .all())
 
 
-def get_digests(db, status='sent'):
-    """Fetch digests by status with item count."""
+def get_newsletters(db, status='sent'):
+    """Fetch newsletters by status with item count."""
     return (db.query(Digest, sqla_func.count(DigestItem.id).label('item_count'))
             .outerjoin(DigestItem)
             .filter(Digest.status == status)
@@ -62,8 +62,8 @@ def get_digests(db, status='sent'):
             .all())
 
 
-def get_digest_articles(db, digest_id):
-    """Fetch articles in a digest, ordered by sort_order."""
+def get_newsletter_articles(db, digest_id):
+    """Fetch articles in a newsletter, ordered by sort_order."""
     return (db.query(Article)
             .join(DigestItem, Article.id == DigestItem.article_id)
             .options(joinedload(Article.source),
@@ -73,8 +73,8 @@ def get_digest_articles(db, digest_id):
             .all())
 
 
-def publish_digest(db, digest_id):
-    """Publish a draft digest."""
+def publish_newsletter(db, digest_id):
+    """Publish a draft newsletter."""
     digest = db.query(Digest).filter(Digest.id == digest_id).first()
     if not digest: return False
     digest.status = 'sent'
@@ -83,8 +83,8 @@ def publish_digest(db, digest_id):
     return True
 
 
-def unpublish_digest(db, digest_id):
-    """Send a published digest back to draft for review."""
+def unpublish_newsletter(db, digest_id):
+    """Send a published newsletter back to draft for review."""
     digest = db.query(Digest).filter(Digest.id == digest_id).first()
     if not digest: return False
     digest.status = 'draft'
@@ -93,24 +93,24 @@ def unpublish_digest(db, digest_id):
     return True
 
 
-def get_latest_digest_summary(db, digest_id):
-    """Get latest summary version for a digest."""
+def get_latest_newsletter_summary(db, digest_id):
+    """Get latest summary version for a newsletter."""
     return (db.query(DigestSummary)
             .filter(DigestSummary.digest_id == digest_id)
             .order_by(desc(DigestSummary.version))
             .first())
 
 
-def get_original_digest_summary(db, digest_id):
-    """Get version 1 (original) digest summary."""
+def get_original_newsletter_summary(db, digest_id):
+    """Get version 1 (original) newsletter summary."""
     return (db.query(DigestSummary)
             .filter(DigestSummary.digest_id == digest_id,
                     DigestSummary.version == 1)
             .first())
 
 
-def create_digest_summary_version(db, digest_id, content, user_id=None):
-    """Create a new summary version for a digest."""
+def create_newsletter_summary_version(db, digest_id, content, user_id=None):
+    """Create a new summary version for a newsletter."""
     max_ver = (db.query(sqla_func.max(DigestSummary.version))
                .filter(DigestSummary.digest_id == digest_id)
                .scalar()) or 0

@@ -1,4 +1,4 @@
-"""Reusable layout components — ribbons, tabs, category cards, digests, keyword search."""
+"""Reusable layout components — ribbons, tabs, category cards, newsletters, keyword search."""
 from fasthtml.common import *
 from monsterui.all import Card, DivLAligned, Loading
 from newsfeed.web.components.styles import (
@@ -41,118 +41,137 @@ def category_card(tag_name, summary_text, article_count, star_count):
         P(summary_text, cls=f"{TEXT_MUTED} leading-relaxed"),
     )
 
-# ── Digest Components ───────────────────────────────────────
+# ── Newsletter Components ──────────────────────────────────
 
-def digest_tab(label, count, tab, active_tab):
-    """Render a single digest ribbon tab."""
+def newsletter_tab(label, count, tab, active_tab):
+    """Render a single newsletter ribbon tab."""
     is_active = tab == active_tab
     return Span(f"{label} ({count})",
                 cls=PILL_ACTIVE if is_active else PILL_INACTIVE,
-                hx_get=f"/executive/digests?tab={tab}",
-                hx_target="#digests-content",
+                hx_get=f"/executive/newsletters?tab={tab}",
+                hx_target="#newsletters-content",
                 hx_swap="outerHTML")
 
 
-def digest_ribbon(draft_count, sent_count, active_tab='draft'):
-    """Render digest tab ribbon."""
+def newsletter_ribbon(draft_count, sent_count, active_tab='draft'):
+    """Render newsletter tab ribbon."""
     return DivLAligned(
-        digest_tab("To be Published", draft_count, "draft", active_tab),
-        digest_tab("Published", sent_count, "sent", active_tab),
+        newsletter_tab("To be Published", draft_count, "draft", active_tab),
+        newsletter_tab("Published", sent_count, "sent", active_tab),
         cls=GAP_2_MB
     )
 
 
-def _digest_action_btn(digest_id, show_publish):
-    """Render publish or review button for a digest."""
+def newsletter_date_range_form():
+    """Render date range form for generating newsletters."""
+    return Div(
+        DivLAligned(
+            Label("From:", cls="text-sm text-muted-foreground"),
+            Input(type="date", name="from_date", cls="text-sm border rounded px-2 py-1"),
+            Label("To:", cls="text-sm text-muted-foreground ml-2"),
+            Input(type="date", name="to_date", cls="text-sm border rounded px-2 py-1"),
+            Button("Generate Newsletter", cls=f"ml-3 {BTN_PRIMARY}",
+                   hx_post="/executive/newsletters/generate",
+                   hx_target="#newsletters-content",
+                   hx_swap="outerHTML",
+                   hx_include="closest div"),
+            cls=GAP_2
+        ),
+        cls="mb-4"
+    )
+
+
+def _newsletter_action_btn(digest_id, show_publish):
+    """Render publish or review button for a newsletter."""
     if show_publish:
         return Button("Publish", cls=f"ml-4 {BTN_SUCCESS}",
-                      hx_post=f"/executive/digests/{digest_id}/publish",
-                      hx_target="#digests-content", hx_swap="outerHTML")
+                      hx_post=f"/executive/newsletters/{digest_id}/publish",
+                      hx_target="#newsletters-content", hx_swap="outerHTML")
     return Button("Review", cls=f"ml-4 {BTN_WARNING}",
-                  hx_post=f"/executive/digests/{digest_id}/review",
-                  hx_target="#digests-content", hx_swap="outerHTML")
+                  hx_post=f"/executive/newsletters/{digest_id}/review",
+                  hx_target="#newsletters-content", hx_swap="outerHTML")
 
 
-def digest_item(digest, item_count, show_publish=False):
-    """Render a single digest list item."""
+def newsletter_item(digest, item_count, show_publish=False):
+    """Render a single newsletter list item."""
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
         DivLAligned(
-            Span("📋", cls=ICON_BASE),
+            Span("📰", cls=ICON_BASE),
             Strong(title, cls=TEXT_LINK,
-                   hx_get=f"/executive/digests/{digest.id}/expand?tab={'draft' if show_publish else 'sent'}",
-                   hx_target=f"#digest-{digest.id}",
+                   hx_get=f"/executive/newsletters/{digest.id}/expand?tab={'draft' if show_publish else 'sent'}",
+                   hx_target=f"#newsletter-{digest.id}",
                    hx_swap="outerHTML"),
             Span(f"({item_count} articles)", cls=TEXT_MUTED_XS),
-            _digest_action_btn(digest.id, show_publish),
+            _newsletter_action_btn(digest.id, show_publish),
             cls=GAP_2
         ),
-        id=f"digest-{digest.id}",
+        id=f"newsletter-{digest.id}",
         cls=ROW_HOVER
     )
 
 
-def digest_expanded(digest, item_count, summary=None, show_publish=False):
-    """Render expanded digest with summary."""
+def newsletter_expanded(digest, item_count, summary=None, show_publish=False):
+    """Render expanded newsletter with HTML content."""
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
         DivLAligned(
-            Span("📋", cls=ICON_BASE),
+            Span("📰", cls=ICON_BASE),
             Strong(title, cls=TEXT_LINK,
-                   hx_get=f"/executive/digests/{digest.id}/collapse?tab={'draft' if show_publish else 'sent'}",
-                   hx_target=f"#digest-{digest.id}",
+                   hx_get=f"/executive/newsletters/{digest.id}/collapse?tab={'draft' if show_publish else 'sent'}",
+                   hx_target=f"#newsletter-{digest.id}",
                    hx_swap="outerHTML"),
             Span(f"({item_count} articles)", cls=TEXT_MUTED_XS),
-            _digest_action_btn(digest.id, show_publish),
+            _newsletter_action_btn(digest.id, show_publish),
             cls=f"{GAP_2} mb-2"
         ),
-        digest_summary_display(digest.id, summary, show_edit=show_publish),
-        id=f"digest-{digest.id}",
+        newsletter_summary_display(digest.id, summary, show_edit=show_publish),
+        id=f"newsletter-{digest.id}",
         cls=ROW_EXPANDED
     )
 
 
-def digest_summary_display(digest_id, summary, show_edit=False):
-    """Render digest summary with edit/revert buttons."""
-    content = summary.content if summary else "No summary available"
+def newsletter_summary_display(digest_id, summary, show_edit=False):
+    """Render newsletter summary — renders HTML content directly."""
+    content = summary.content if summary else "No content available"
     actions = []
     if show_edit:
         actions.append(Span("✏️ Edit", cls=TEXT_EDIT,
-                            hx_get=f"/executive/digests/{digest_id}/edit",
-                            hx_target=f"#digest-summary-{digest_id}",
+                            hx_get=f"/executive/newsletters/{digest_id}/edit",
+                            hx_target=f"#newsletter-summary-{digest_id}",
                             hx_swap="outerHTML"))
         if summary and summary.version > 1:
             actions.append(Span("↩ Revert", cls=TEXT_REVERT,
-                                hx_post=f"/executive/digests/{digest_id}/revert",
-                                hx_target=f"#digest-summary-{digest_id}",
+                                hx_post=f"/executive/newsletters/{digest_id}/revert",
+                                hx_target=f"#newsletter-summary-{digest_id}",
                                 hx_swap="outerHTML"))
     return Div(
-        P(content, cls=f"{TEXT_MUTED} leading-relaxed whitespace-pre-line"),
+        Div(NotStr(content), cls="leading-relaxed"),
         DivLAligned(*actions, cls=f"{GAP_2} mt-2") if actions else None,
-        id=f"digest-summary-{digest_id}",
+        id=f"newsletter-summary-{digest_id}",
         cls="mt-2"
     )
 
 
-def digest_summary_edit_form(digest_id, summary):
-    """Render inline edit form for digest summary."""
+def newsletter_summary_edit_form(digest_id, summary):
+    """Render inline edit form for newsletter content (raw HTML)."""
     content = summary.content if summary else ''
     return Div(
-        Textarea(content, name="content", rows=8,
+        Textarea(content, name="content", rows=12,
                  cls=f"{TEXTAREA} mb-2"),
         DivLAligned(
             Button("Save", cls=BTN_SUCCESS,
-                   hx_post=f"/executive/digests/{digest_id}/save",
-                   hx_target=f"#digest-summary-{digest_id}",
+                   hx_post=f"/executive/newsletters/{digest_id}/save",
+                   hx_target=f"#newsletter-summary-{digest_id}",
                    hx_swap="outerHTML",
-                   hx_include=f"#digest-summary-{digest_id}"),
+                   hx_include=f"#newsletter-summary-{digest_id}"),
             Span("Cancel", cls=TEXT_CANCEL,
-                 hx_get=f"/executive/digests/{digest_id}/cancel",
-                 hx_target=f"#digest-summary-{digest_id}",
+                 hx_get=f"/executive/newsletters/{digest_id}/cancel",
+                 hx_target=f"#newsletter-summary-{digest_id}",
                  hx_swap="outerHTML"),
             cls=GAP_3
         ),
-        id=f"digest-summary-{digest_id}",
+        id=f"newsletter-summary-{digest_id}",
         cls="mt-2 p-3 border border-border rounded-lg bg-background"
     )
 

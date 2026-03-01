@@ -19,8 +19,9 @@ from newsfeed.web.components.filters import (
 # Layout components
 from newsfeed.web.components.layouts import (
     category_tab, category_ribbon, category_card,
-    digest_tab, digest_ribbon, digest_item, digest_expanded,
-    digest_summary_display, digest_summary_edit_form,
+    newsletter_tab, newsletter_ribbon, newsletter_date_range_form,
+    newsletter_item, newsletter_expanded,
+    newsletter_summary_display, newsletter_summary_edit_form,
     exec_search_box, exec_search_results,
     keyword_summary_item, keyword_summaries_list
 )

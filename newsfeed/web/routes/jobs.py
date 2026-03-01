@@ -45,17 +45,17 @@ def run_category_summaries(request):
         set_job_complete(db, 'category_summarizer', success=False, error=str(e))
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
-@ar.get('/run-digest')
-def run_digest(request):
+@ar.get('/run-newsletter')
+def run_newsletter(request):
     db = request.state.db
     try:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
-        from newsfeed.scripts.create_digest import run
+        from newsfeed.scripts.create_newsletter import run
         run()
-        set_job_complete(db, 'digest_creator', success=True)
+        set_job_complete(db, 'newsletter_creator', success=True)
         return JSONResponse({'status': 'success'})
     except Exception as e:
-        set_job_complete(db, 'digest_creator', success=False, error=str(e))
+        set_job_complete(db, 'newsletter_creator', success=False, error=str(e))
         return JSONResponse({'status': 'error', 'message': str(e)}, status_code=500)
 
 @ar.get('/backfill')

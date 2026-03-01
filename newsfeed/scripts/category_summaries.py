@@ -1,6 +1,6 @@
 """Generate category summaries — daily, weekly, monthly."""
 
-import os, json, logging
+import os, json, logging, time
 from datetime import datetime, date, timedelta
 import newsfeed.env  # noqa: F401 — load .env once
 
@@ -11,7 +11,7 @@ from newsfeed.storage.models import (
     Article, ArticleTag, Tag, CategorySummary, AppSetting
 )
 from newsfeed.cost import track_usage
-from newsfeed.config import DEFAULT_MODEL
+from newsfeed.config import DEFAULT_MODEL, MODEL_TOKEN_LIMITS
 
 log = logging.getLogger("newsfeed.scripts.category_summaries")
 
@@ -73,6 +73,18 @@ Articles:
 {articles}
 """
 
+REDUCE_PROMPT = """You are a market intelligence analyst for a data center company.
+Below are partial summaries covering {count} articles about "{tag}" from {date_from} to {date_to}.
+
+Combine these into a single cohesive summary (3-5 sentences) covering:
+- Key themes and trends
+- Most significant developments
+- Any competitive implications for Equinix
+
+Partial summaries:
+{summaries}
+"""
+
 def truncate_to_sentence(text: str, max_chars: int = 500) -> str:
     """Truncate text at the nearest sentence boundary before max_chars."""
     if not text or len(text) <= max_chars:
@@ -85,10 +97,57 @@ def truncate_to_sentence(text: str, max_chars: int = 500) -> str:
             return truncated[:idx + 1]
     return truncated.rsplit(' ', 1)[0] + '…'
 
-def generate_summary(tag_name: str, articles: list[Article],
-                     date_from: date, date_to: date,
-                     model: str = None) -> str:
-    if model is None: model = DEFAULT_MODEL
+# ── Token Estimation & Chunking ─────────────────────────────
+
+def estimate_tokens(text: str) -> int:
+    """Estimate token count from text. Rough heuristic: ~4 chars per token."""
+    try:
+        return max(1, len(text) // 4)
+    except Exception:
+        return 1
+
+def get_token_limit(model: str) -> int:
+    """Get token limit for a model from config."""
+    return MODEL_TOKEN_LIMITS.get(model, 8192)
+
+def chunk_articles(articles: list[Article], tag_name: str,
+                   date_from, date_to, model: str) -> list[list[Article]]:
+    """Split articles into chunks that fit within the model's token budget."""
+    token_limit = get_token_limit(model)
+    # Use 70% of limit for content, leaving 30% for prompt template + response
+    content_budget = int(token_limit * 0.7)
+    # Subtract prompt template overhead (without articles)
+    template_overhead = estimate_tokens(CATEGORY_PROMPT.format(
+        count=0, tag=tag_name, date_from=date_from, date_to=date_to, articles=""
+    ))
+    available = content_budget - template_overhead
+
+    chunks = []
+    current_chunk = []
+    current_tokens = 0
+
+    for a in articles:
+        article_text = f"- {a.title} ({a.date}): {truncate_to_sentence(a.content)}"
+        article_tokens = estimate_tokens(article_text)
+
+        if current_tokens + article_tokens > available and current_chunk:
+            chunks.append(current_chunk)
+            current_chunk = []
+            current_tokens = 0
+
+        current_chunk.append(a)
+        current_tokens += article_tokens
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
+# ── Map-Reduce Summarization ───────────────────────────────
+
+def summarize_chunk(tag_name: str, articles: list[Article],
+                    date_from, date_to, model: str) -> tuple[str, int, int]:
+    """Summarize a single chunk of articles. Returns (summary, prompt_tokens, response_tokens)."""
     article_text = "\n\n".join(
         f"- {a.title} ({a.date}): {truncate_to_sentence(a.content)}"
         for a in articles
@@ -101,9 +160,68 @@ def generate_summary(tag_name: str, articles: list[Article],
     client = _get_client()
     response = client.models.generate_content(model=model, contents=prompt)
     usage = response.usage_metadata
-    track_usage(usage.prompt_token_count, usage.candidates_token_count, model)
-    log.info(f"Category summary for '{tag_name}' ({usage.prompt_token_count} in, {usage.candidates_token_count} out)")
-    return response.text
+    return response.text, usage.prompt_token_count or 0, usage.candidates_token_count or 0
+
+def generate_summary(tag_name: str, articles: list[Article],
+                     date_from: date, date_to: date,
+                     model: str = None) -> str:
+    if model is None: model = DEFAULT_MODEL
+
+    try:
+        chunks = chunk_articles(articles, tag_name, date_from, date_to, model)
+
+        if len(chunks) == 1:
+            # Fits in a single call
+            summary, p_tokens, r_tokens = summarize_chunk(
+                tag_name, chunks[0], date_from, date_to, model
+            )
+            track_usage(p_tokens, r_tokens, model)
+            log.info(f"Category summary for '{tag_name}' ({p_tokens} in, {r_tokens} out)")
+            return summary
+
+        # Map step: summarize each chunk
+        log.info(f"Map-reduce: '{tag_name}' split into {len(chunks)} chunks")
+        partial_summaries = []
+        total_p, total_r = 0, 0
+
+        for i, chunk in enumerate(chunks):
+            if i > 0:
+                log.info(f"  Rate limit pause (45s)...")
+                time.sleep(45)
+            summary, p_tokens, r_tokens = summarize_chunk(
+                tag_name, chunk, date_from, date_to, model
+            )
+            partial_summaries.append(summary)
+            total_p += p_tokens
+            total_r += r_tokens
+            log.info(f"  Chunk {i+1}/{len(chunks)}: {len(chunk)} articles ({p_tokens} in, {r_tokens} out)")
+
+        # Reduce step: combine partial summaries (pause for rate limit)
+        log.info(f"  Rate limit pause before reduce (45s)...")
+        time.sleep(45)
+        combined = "\n\n".join(
+            f"Summary {i+1}:\n{s}" for i, s in enumerate(partial_summaries)
+        )
+        reduce_prompt = REDUCE_PROMPT.format(
+            count=len(articles), tag=tag_name,
+            date_from=date_from, date_to=date_to,
+            summaries=combined,
+        )
+
+        client = _get_client()
+        response = client.models.generate_content(model=model, contents=reduce_prompt)
+        usage = response.usage_metadata
+        total_p += usage.prompt_token_count or 0
+        total_r += usage.candidates_token_count or 0
+
+        track_usage(total_p, total_r, model)
+        log.info(f"Category summary for '{tag_name}' — map-reduce total ({total_p} in, {total_r} out)")
+
+        return response.text
+
+    except Exception as e:
+        log.error(f"Failed to generate summary for '{tag_name}': {e}")
+        raise
 
 # ── Save ────────────────────────────────────────────────────
 
