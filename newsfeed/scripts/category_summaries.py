@@ -2,8 +2,7 @@
 
 import os, json, logging
 from datetime import datetime, date, timedelta
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 
 from sqlalchemy import func
 from google import genai

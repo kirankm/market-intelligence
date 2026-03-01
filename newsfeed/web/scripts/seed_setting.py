@@ -1,7 +1,6 @@
 """Manage app settings from command line."""
 import sys
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import AppSetting
 

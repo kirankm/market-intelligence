@@ -1,7 +1,6 @@
 """Background worker — processes pending keyword summaries via Gemini."""
 import time, logging
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 import google.generativeai as genai
 from datetime import datetime
 from newsfeed.storage.database import get_session

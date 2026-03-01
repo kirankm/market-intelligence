@@ -3,8 +3,11 @@ from fasthtml.common import *
 from monsterui.all import Card, ButtonT, DivHStacked, DivLAligned, Loading
 from newsfeed.web.components.styles import (
     PILL_TAG, PILL_TAG_REMOVE, BTN_PRIMARY, BTN_MUTED,
-    TEXT_MUTED, TEXT_MUTED_XS, TEXT_ITALIC, TEXT_LINK,
-    ROW_HOVER, ROW_EXPANDED, INPUT
+    TEXT_MUTED, TEXT_MUTED_XS, TEXT_ITALIC, TEXT_LINK, TEXT_SUBTITLE,
+    TAG_INPUT, TAG_INPUT_ML, TAG_LINK, LIST_DISC, SENTINEL,
+    ROW_HOVER, ROW_EXPANDED,
+    FLEX_WRAP, FLEX_WRAP_ITEMS, FLEX_CENTER, FLEX_COL_GAP, FLEX_1,
+    GAP_3_START, PANEL_MUTED, ICON_EDIT, ICON_STAR,
 )
 import re as re_module
 
@@ -19,13 +22,13 @@ def tag_display(article_id, tags):
     pills = [tag_pill(t) for t in tags]
     return Div(
         *pills,
-        Span("✏️", cls="text-xs cursor-pointer hover:scale-110 transition ml-1",
+        Span("✏️", cls=ICON_EDIT,
              hx_get=f"/feed/article/{article_id}/tags/edit",
              hx_target=f"#tags-{article_id}",
              hx_swap="outerHTML",
              title="Edit tags"),
         id=f"tags-{article_id}",
-        cls="flex gap-1.5 flex-wrap items-center"
+        cls=FLEX_WRAP_ITEMS
     )
 
 
@@ -47,18 +50,18 @@ def tag_editor(article_id, current_tags, all_tags):
     tag_options = [Option(t, value=t) for t in available]
     add_form = Form(
         Select(*tag_options, name="tag_name", id=f"tag-select-{article_id}",
-               cls="text-xs px-1 py-0.5 rounded border",
+               cls=TAG_INPUT,
                onchange=f"document.getElementById('free-text-{article_id}').style.display = this.value === 'Other' ? 'inline' : 'none'"),
         Input(type="text", name="free_text", placeholder="Enter tag...",
               id=f"free-text-{article_id}",
-              cls="text-xs px-1 py-0.5 rounded border ml-1",
+              cls=TAG_INPUT_ML,
               style="display:none"),
         Button("Add", type="submit",
                cls=f"{BTN_PRIMARY} ml-1"),
         hx_post=f"/feed/article/{article_id}/tags/add",
         hx_target=f"#tags-{article_id}",
         hx_swap="outerHTML",
-        cls="flex items-center"
+        cls=FLEX_CENTER
     )
 
     done_btn = Span("✓ Done", cls=f"{BTN_MUTED} cursor-pointer hover:bg-muted/80 ml-2",
@@ -67,10 +70,10 @@ def tag_editor(article_id, current_tags, all_tags):
                     hx_swap="outerHTML")
 
     return Div(
-        Div(*current_pills, cls="flex gap-1.5 flex-wrap mb-1"),
-        Div(add_form, done_btn, cls="flex items-center"),
+        Div(*current_pills, cls=f"{FLEX_WRAP} mb-1"),
+        Div(add_form, done_btn, cls=FLEX_CENTER),
         id=f"tags-{article_id}",
-        cls="flex flex-col gap-1 p-2 bg-muted/30 rounded"
+        cls=f"{FLEX_COL_GAP} {PANEL_MUTED}"
     )
 
 
@@ -91,7 +94,7 @@ def star_icon(starred, article_id):
     """Render star icon with HTMX toggle."""
     return Span(
         "⭐" if starred else "☆",
-        cls="text-lg cursor-pointer hover:scale-110 transition",
+        cls=ICON_STAR,
         hx_post=f"/feed/article/{article_id}/star",
         hx_swap="outerHTML"
     )
@@ -110,9 +113,9 @@ def summary_section(summary, search=''):
     bullets = summary.bullets or []
     subtitle = highlight(summary.subtitle, search) if search else summary.subtitle
     return Div(
-        P(subtitle, cls="text-sm font-medium mt-2") if summary.subtitle else None,
+        P(subtitle, cls=TEXT_SUBTITLE) if summary.subtitle else None,
         Ul(*[Li(highlight(b, search) if search else b, cls=TEXT_MUTED)
-             for b in bullets], cls="list-disc ml-5 mt-1"),
+             for b in bullets], cls=LIST_DISC),
     )
 
 
@@ -130,9 +133,9 @@ def article_card(article, tags, starred, search=''):
                     hx_swap="outerHTML",
                     onclick="collapseExpanded(this)"),
                 card_meta(article, source_name, tags),
-                cls="flex-1"
+                cls=FLEX_1
             ),
-            cls="gap-3 items-start"
+            cls=GAP_3_START
         ),
         cls=ROW_HOVER,
         id=f"article-{article.id}"
@@ -154,10 +157,10 @@ def expanded_card(article, tags, starred, summary, search=''):
                 card_meta(article, source_name, tags),
                 summary_section(summary, search),
                 A("🔗 Read original", href=article.url, target="_blank",
-                  cls="text-sm text-primary hover:text-primary/80 mt-2 inline-block transition"),
-                cls="flex-1"
+                  cls=TAG_LINK),
+                cls=FLEX_1
             ),
-            cls="gap-3 items-start"
+            cls=GAP_3_START
         ),
         cls=f"{ROW_EXPANDED} expanded",
         id=f"article-{article.id}"
@@ -172,4 +175,4 @@ def load_more_sentinel(state, offset, page_size):
     params['page_size'] = str(page_size)
     cleaned = {k: v for k, v in params.items() if v}
     url = f"{state.base}/more?{urlencode(cleaned)}"
-    return Div(hx_get=url, hx_trigger="revealed", hx_swap="outerHTML", cls="h-1")
+    return Div(hx_get=url, hx_trigger="revealed", hx_swap="outerHTML", cls=SENTINEL)

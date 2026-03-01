@@ -2,8 +2,7 @@
 
 import os, logging
 from datetime import date, timedelta
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import (

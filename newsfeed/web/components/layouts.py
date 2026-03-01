@@ -4,8 +4,9 @@ from monsterui.all import Card, DivLAligned, Loading
 from newsfeed.web.components.styles import (
     PILL_ACTIVE, PILL_INACTIVE, BTN_SUCCESS, BTN_WARNING, BTN_PRIMARY,
     INPUT_EXEC, TEXT_MUTED, TEXT_MUTED_XS, TEXT_ITALIC, TEXT_LINK, TEXT_HEADING,
-    TEXT_EDIT, TEXT_CANCEL, TEXT_DELETE, TEXTAREA,
-    ROW_BORDER, ROW_HOVER, ROW_EXPANDED
+    TEXT_EDIT, TEXT_CANCEL, TEXT_DELETE, TEXT_REVERT, TEXTAREA,
+    ROW_BORDER, ROW_HOVER, ROW_EXPANDED,
+    GAP_2, GAP_2_WRAP, GAP_2_MB, GAP_3, SECTION_MT, ICON_SM, ICON_BASE,
 )
 
 # ── Category Components ─────────────────────────────────────
@@ -24,7 +25,7 @@ def category_ribbon(tag_names, active_name, period_from, period_to):
     """Render horizontal category tabs."""
     return DivLAligned(
         *[category_tab(n, active_name, period_from, period_to) for n in tag_names],
-        cls="gap-2 flex-wrap mb-4"
+        cls=f"{GAP_2_WRAP} mb-4"
     )
 
 
@@ -57,7 +58,7 @@ def digest_ribbon(draft_count, sent_count, active_tab='draft'):
     return DivLAligned(
         digest_tab("To be Published", draft_count, "draft", active_tab),
         digest_tab("Published", sent_count, "sent", active_tab),
-        cls="gap-2 mb-4"
+        cls=GAP_2_MB
     )
 
 
@@ -77,14 +78,14 @@ def digest_item(digest, item_count, show_publish=False):
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
         DivLAligned(
-            Span("📋", cls="text-base"),
+            Span("📋", cls=ICON_BASE),
             Strong(title, cls=TEXT_LINK,
                    hx_get=f"/executive/digests/{digest.id}/expand?tab={'draft' if show_publish else 'sent'}",
                    hx_target=f"#digest-{digest.id}",
                    hx_swap="outerHTML"),
             Span(f"({item_count} articles)", cls=TEXT_MUTED_XS),
             _digest_action_btn(digest.id, show_publish),
-            cls="gap-2"
+            cls=GAP_2
         ),
         id=f"digest-{digest.id}",
         cls=ROW_HOVER
@@ -96,14 +97,14 @@ def digest_expanded(digest, item_count, summary=None, show_publish=False):
     title = digest.title or f"{digest.date_from} — {digest.date_to}"
     return Div(
         DivLAligned(
-            Span("📋", cls="text-base"),
+            Span("📋", cls=ICON_BASE),
             Strong(title, cls=TEXT_LINK,
                    hx_get=f"/executive/digests/{digest.id}/collapse?tab={'draft' if show_publish else 'sent'}",
                    hx_target=f"#digest-{digest.id}",
                    hx_swap="outerHTML"),
             Span(f"({item_count} articles)", cls=TEXT_MUTED_XS),
             _digest_action_btn(digest.id, show_publish),
-            cls="gap-2 mb-2"
+            cls=f"{GAP_2} mb-2"
         ),
         digest_summary_display(digest.id, summary, show_edit=show_publish),
         id=f"digest-{digest.id}",
@@ -121,13 +122,13 @@ def digest_summary_display(digest_id, summary, show_edit=False):
                             hx_target=f"#digest-summary-{digest_id}",
                             hx_swap="outerHTML"))
         if summary and summary.version > 1:
-            actions.append(Span("↩ Revert", cls="text-xs text-yellow-600 cursor-pointer hover:underline ml-2",
+            actions.append(Span("↩ Revert", cls=TEXT_REVERT,
                                 hx_post=f"/executive/digests/{digest_id}/revert",
                                 hx_target=f"#digest-summary-{digest_id}",
                                 hx_swap="outerHTML"))
     return Div(
         P(content, cls=f"{TEXT_MUTED} leading-relaxed whitespace-pre-line"),
-        DivLAligned(*actions, cls="gap-2 mt-2") if actions else None,
+        DivLAligned(*actions, cls=f"{GAP_2} mt-2") if actions else None,
         id=f"digest-summary-{digest_id}",
         cls="mt-2"
     )
@@ -149,7 +150,7 @@ def digest_summary_edit_form(digest_id, summary):
                  hx_get=f"/executive/digests/{digest_id}/cancel",
                  hx_target=f"#digest-summary-{digest_id}",
                  hx_swap="outerHTML"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"digest-summary-{digest_id}",
         cls="mt-2 p-3 border border-border rounded-lg bg-background"
@@ -160,7 +161,7 @@ def digest_summary_edit_form(digest_id, summary):
 def exec_search_box(search=''):
     """Render search box for executive keyword search."""
     return DivLAligned(
-        Span("🔍", cls="text-sm"),
+        Span("🔍", cls=ICON_SM),
         Input(type="text", name="search", value=search,
               placeholder="Search articles...",
               hx_get="/executive/search",
@@ -168,8 +169,8 @@ def exec_search_box(search=''):
               hx_swap="outerHTML",
               hx_trigger="keyup changed delay:300ms",
               hx_include="this",
-              cls=EXEC_INPUT),
-        cls="gap-2 mb-4"
+              cls=INPUT_EXEC),
+        cls=GAP_2_MB
     )
 
 
@@ -200,9 +201,9 @@ def keyword_summary_item(ks, expanded=True):
     if ks.status == 'pending':
         return Div(
             DivLAligned(
-                Span(f"🔍 \"{ks.query}\"", cls="text-sm text-muted-foreground"),
+                Span(f"🔍 \"{ks.query}\"", cls=TEXT_MUTED),
                 Loading(),
-                cls="gap-2"
+                cls=GAP_2
             ),
             hx_get="/executive/search/summaries",
             hx_trigger="every 3s",
@@ -223,7 +224,7 @@ def keyword_summary_item(ks, expanded=True):
              hx_target="#search-summaries-list",
              hx_swap="outerHTML",
              hx_confirm="Delete this summary?"),
-        cls="gap-2"
+        cls=GAP_2
     )
     body = P(ks.summary, cls=f"{TEXT_MUTED} leading-relaxed mt-1") if expanded else None
     return Div(header, body, id=f"ks-{ks.id}", cls=ROW_BORDER)
@@ -244,6 +245,6 @@ def keyword_summaries_list(summaries):
         H4("Your Summaries", cls=f"{TEXT_HEADING} mb-2"),
         *items,
         id="search-summaries-list",
-        cls="mt-4",
+        cls=SECTION_MT,
         **attrs
     )

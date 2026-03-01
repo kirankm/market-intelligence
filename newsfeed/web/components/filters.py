@@ -5,7 +5,8 @@ from urllib.parse import urlencode
 from newsfeed.web.filters import FilterState
 from newsfeed.web.components.styles import (
     PILL, PILL_ACTIVE, PILL_INACTIVE, PILL_CLEAR, PILL_MORE,
-    BTN_SUCCESS, BTN_WARNING, BTN_PRIMARY, INPUT_EXEC, TEXT_LABEL, TEXT_SECTION_TITLE
+    BTN_SUCCESS, BTN_WARNING, BTN_PRIMARY, INPUT, INPUT_EXEC, TEXT_LABEL, TEXT_SECTION_TITLE,
+    GAP_2, GAP_2_WRAP, GAP_2_MB, ICON_SM, COLLAPSIBLE, COLLAPSIBLE_HEADER, COLLAPSIBLE_BODY,
 )
 import json
 
@@ -73,7 +74,7 @@ def tag_filter(tags_with_counts, state, top_n=5):
     if state.expanded and rest_count > 0: pills.append(less_pill(state))
     return DivLAligned(
         Span("Tags:", cls=TEXT_LABEL), *pills,
-        cls="gap-2 flex-wrap"
+        cls=GAP_2_WRAP
     )
 
 
@@ -88,8 +89,8 @@ def source_filter(sources_with_counts, state):
         Select(*options, name="source",
                hx_get=state.base, hx_target=f"#{state.target}", hx_swap="outerHTML",
                hx_include="this", hx_vals=json.dumps(other_params),
-               cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground"),
-        cls="gap-2"
+               cls=INPUT),
+        cls=GAP_2
     )
 
 
@@ -109,14 +110,14 @@ def date_filter(state):
     return DivLAligned(
         Span("Date:", cls=TEXT_LABEL),
         *[date_button(label, period, state) for label, period in buttons],
-        cls="gap-2"
+        cls=GAP_2
     )
 
 
 def search_box(state, debounce=300):
     """Render search input with debounced HTMX."""
     return DivLAligned(
-        Span("🔍", cls="text-sm"),
+        Span("🔍", cls=ICON_SM),
         Input(type="text", name="search", value=state.search,
               placeholder="Search title/summary...",
               hx_get=build_filter_url(state, search=''),
@@ -125,7 +126,7 @@ def search_box(state, debounce=300):
               hx_trigger=f"keyup changed delay:{debounce}ms",
               hx_include="this",
               cls=EXEC_INPUT),
-        cls="gap-2"
+        cls=GAP_2
     )
 
 
@@ -138,11 +139,11 @@ def collapsible_section(title, content, section_id, open=False):
             hx_get=f"/executive/section/{section_id}?open={'0' if open else '1'}",
             hx_target=f"#section-{section_id}",
             hx_swap="outerHTML",
-            cls="px-4 py-3 bg-muted/50 hover:bg-muted transition"
+            cls=COLLAPSIBLE_HEADER
         ),
-        Div(content, cls="px-4 py-3") if open else None,
+        Div(content, cls=COLLAPSIBLE_BODY) if open else None,
         id=f"section-{section_id}",
-        cls="border border-border rounded-lg overflow-hidden mb-4"
+        cls=COLLAPSIBLE
     )
 
 
@@ -165,6 +166,6 @@ def category_period_dropdown(periods, active_from=None, active_to=None):
                hx_target="#categories-content",
                hx_swap="outerHTML",
                hx_include="this",
-               cls="text-sm border border-input rounded px-2 py-1 bg-background text-foreground"),
-        cls="gap-2 mb-4"
+               cls=INPUT),
+        cls=GAP_2_MB
     )

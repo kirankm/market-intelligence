@@ -1,7 +1,6 @@
 """Onboarding script — add a user with a role."""
 import sys
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import User, Role, UserRole
 

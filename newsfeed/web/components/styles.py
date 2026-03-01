@@ -1,5 +1,45 @@
 """Shared CSS class constants for UI components."""
 
+# ── Layout Utilities ────────────────────────────────────────
+FLEX_WRAP = "flex gap-1.5 flex-wrap"
+FLEX_WRAP_ITEMS = "flex gap-1.5 flex-wrap items-center"
+FLEX_CENTER = "flex items-center"
+FLEX_COL_GAP = "flex flex-col gap-1"
+FLEX_1 = "flex-1"
+GAP_2 = "gap-2"
+GAP_2_WRAP = "gap-2 flex-wrap"
+GAP_2_MB = "gap-2 mb-4"
+GAP_3 = "gap-3"
+GAP_3_START = "gap-3 items-start"
+GAP_4 = "gap-4"
+SECTION_MT = "mt-4"
+PANEL_MUTED = "p-2 bg-muted/30 rounded"
+COLLAPSIBLE = "border border-border rounded-lg overflow-hidden mb-4"
+COLLAPSIBLE_HEADER = "px-4 py-3 bg-muted/50 hover:bg-muted transition"
+COLLAPSIBLE_BODY = "px-4 py-3"
+
+# ── Icons ───────────────────────────────────────────────────
+ICON_EDIT = "text-xs cursor-pointer hover:scale-110 transition ml-1"
+ICON_STAR = "text-lg cursor-pointer hover:scale-110 transition"
+ICON_SM = "text-sm"
+ICON_BASE = "text-base"
+
+# ── Tag Editor ──────────────────────────────────────────────
+TAG_INPUT = "text-xs px-1 py-0.5 rounded border"
+TAG_INPUT_ML = "text-xs px-1 py-0.5 rounded border ml-1"
+TAG_LINK = "text-sm text-primary hover:text-primary/80 mt-2 inline-block transition"
+
+# ── Text Extras ─────────────────────────────────────────────
+TEXT_SUBTITLE = "text-sm font-medium mt-2"
+TEXT_COST = "text-sm text-foreground font-medium w-24 text-right"
+TEXT_REVERT = "text-xs text-yellow-600 cursor-pointer hover:underline ml-2"
+
+# ── Lists ───────────────────────────────────────────────────
+LIST_DISC = "list-disc ml-5 mt-1"
+
+# ── Sentinel ────────────────────────────────────────────────
+SENTINEL = "h-1"
+
 # ── Pills ───────────────────────────────────────────────────
 PILL = "text-xs px-2 py-0.5 rounded-full cursor-pointer transition"
 PILL_ACTIVE = f"{PILL} bg-primary text-primary-foreground font-semibold"

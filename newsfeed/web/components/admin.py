@@ -5,9 +5,11 @@ from newsfeed.web.components.styles import (
     PILL, PILL_ACTIVE, PILL_INACTIVE, PILL_TAG,
     BTN, BTN_SUCCESS, BTN_PRIMARY, BTN_MUTED,
     INPUT, INPUT_WIDE,
-    TEXT_MUTED, TEXT_MUTED_XS, TEXT_LABEL, TEXT_HEADING, TEXT_ITALIC, TEXT_COL_HEADER, TEXT_TOTAL, TEXT_EDIT, TEXT_CANCEL, TEXT_DELETE,
+    TEXT_MUTED, TEXT_MUTED_XS, TEXT_LABEL, TEXT_HEADING, TEXT_ITALIC,
+    TEXT_COL_HEADER, TEXT_TOTAL, TEXT_EDIT, TEXT_CANCEL, TEXT_DELETE, TEXT_COST,
     BADGE_RUNNING, BADGE_SUCCESS, BADGE_FAILED, BADGE_IDLE,
     ROW_BORDER, HEADER_ROW, TOTAL_ROW, TOGGLE_ACTIVE, TOGGLE_INACTIVE,
+    GAP_2, GAP_2_MB, GAP_3, GAP_4, SECTION_MT, ICON_SM,
 )
 
 # ── Constants ───────────────────────────────────────────────
@@ -55,7 +57,7 @@ def admin_ribbon(active_tab='settings'):
     """Render admin tab ribbon."""
     return DivLAligned(
         *[admin_tab(label, tab, active_tab) for label, tab in ADMIN_TABS],
-        cls="gap-2 mb-4"
+        cls=GAP_2_MB
     )
 
 # ── Settings ────────────────────────────────────────────────
@@ -76,7 +78,7 @@ def settings_row(key, value):
                  hx_target="#admin-content",
                  hx_swap="outerHTML",
                  hx_confirm=f"Delete setting '{key}'?"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"setting-{key}",
         cls=ROW_BORDER
@@ -99,7 +101,7 @@ def settings_edit_row(key, value):
                  hx_get=f"/admin/tab/settings",
                  hx_target="#admin-content",
                  hx_swap="outerHTML"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"setting-{key}",
         cls=ROW_BORDER
@@ -119,10 +121,10 @@ def settings_add_form():
                    hx_target="#admin-content",
                    hx_swap="outerHTML",
                    hx_include="#settings-add-form"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id="settings-add-form",
-        cls="mt-4"
+        cls=SECTION_MT
     )
 
 
@@ -155,7 +157,7 @@ def user_row(user, role_name):
                  hx_target="#admin-content",
                  hx_swap="outerHTML",
                  hx_confirm=f"Delete user '{user.name}'?"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"user-{user.id}",
         cls=ROW_BORDER
@@ -180,7 +182,7 @@ def user_edit_row(user, role_name):
                  hx_get="/admin/tab/users",
                  hx_target="#admin-content",
                  hx_swap="outerHTML"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"user-{user.id}",
         cls=ROW_BORDER
@@ -203,10 +205,10 @@ def user_add_form():
                    hx_target="#admin-content",
                    hx_swap="outerHTML",
                    hx_include="#user-add-form"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id="user-add-form",
-        cls="mt-4"
+        cls=SECTION_MT
     )
 
 
@@ -217,7 +219,7 @@ def users_table(users, get_role_fn):
             Span("Name", cls=f"{TEXT_COL_HEADER} w-40"),
             Span("Email", cls=f"{TEXT_COL_HEADER} w-56"),
             Span("Role", cls=f"{TEXT_COL_HEADER}"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         cls=HEADER_ROW
     )
@@ -236,9 +238,9 @@ def users_table(users, get_role_fn):
 def source_status_icon(source):
     """Render ✅ or ⚠️ based on last success/failure."""
     if not source.last_success and not source.last_failure: return Span("—", cls=TEXT_MUTED_XS)
-    if not source.last_failure: return Span("✅", cls="text-sm")
-    if not source.last_success: return Span("⚠️", cls="text-sm")
-    return Span("✅" if source.last_success > source.last_failure else "⚠️", cls="text-sm")
+    if not source.last_failure: return Span("✅", cls=ICON_SM)
+    if not source.last_success: return Span("⚠️", cls=ICON_SM)
+    return Span("✅" if source.last_success > source.last_failure else "⚠️", cls=ICON_SM)
 
 
 def source_row(source):
@@ -256,7 +258,7 @@ def source_row(source):
                 hx_target="#admin-content",
                 hx_swap="outerHTML"
             ),
-            cls="gap-3"
+            cls=GAP_3
         ),
         id=f"source-{source.id}",
         cls=ROW_BORDER
@@ -272,7 +274,7 @@ def sources_table(sources):
             Span("URL", cls=f"{TEXT_COL_HEADER} w-56"),
             Span("Last Run", cls=f"{TEXT_COL_HEADER} w-24"),
             Span("Active", cls=f"{TEXT_COL_HEADER}"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         cls=HEADER_ROW
     )
@@ -302,7 +304,7 @@ def cost_period_filter(active_period='all'):
     return DivLAligned(
         Span("Period:", cls=TEXT_LABEL),
         *[cost_period_button(l, p, active_period) for l, p in COST_PERIODS],
-        cls="gap-2 mb-4"
+        cls=GAP_2_MB
     )
 
 
@@ -314,9 +316,9 @@ def cost_row(name, articles, input_tokens, output_tokens, cost, last_run):
             Span(str(articles or 0), cls=f"{TEXT_MUTED} w-20 text-right"),
             Span(f"{(input_tokens or 0):,}", cls=f"{TEXT_MUTED} w-28 text-right"),
             Span(f"{(output_tokens or 0):,}", cls=f"{TEXT_MUTED} w-28 text-right"),
-            Span(f"${float(cost or 0):.4f}", cls="text-sm text-foreground font-medium w-24 text-right"),
+            Span(f"${float(cost or 0):.4f}", cls=TEXT_COST),
             Span(format_ago(last_run), cls=f"{TEXT_MUTED_XS} w-24 text-right"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         cls=ROW_BORDER
     )
@@ -332,7 +334,7 @@ def cost_totals_row(totals):
             Span(f"{(totals.output_tokens or 0):,}", cls=f"{TEXT_TOTAL} w-28 text-right"),
             Span(f"${float(totals.cost or 0):.4f}", cls=f"{TEXT_TOTAL} w-24 text-right"),
             Span("", cls="w-24"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         cls=TOTAL_ROW
     )
@@ -348,14 +350,14 @@ def costs_table(rows, totals, active_period='all'):
             Span("Output Tokens", cls=f"{TEXT_COL_HEADER} w-28 text-right"),
             Span("Cost", cls=f"{TEXT_COL_HEADER} w-24 text-right"),
             Span("Last Run", cls=f"{TEXT_COL_HEADER} w-24 text-right"),
-            cls="gap-3"
+            cls=GAP_3
         ),
         cls=HEADER_ROW
     )
     data_rows = [cost_row(r.name, r.articles, r.input_tokens, r.output_tokens, r.cost, r.last_run)
                  for r in rows]
     if not data_rows:
-        data_rows = [P("No cost data available", cls="text-sm text-muted-foreground italic py-2")]
+        data_rows = [P("No cost data available", cls=TEXT_ITALIC)]
     return Div(
         H4("Cost Tracking", cls=f"{TEXT_HEADING} mb-3"),
         cost_period_filter(active_period),
@@ -382,12 +384,12 @@ def job_params_form(job):
     params = job.get('params', [])
     if not params: return None
     inputs = [DivLAligned(
-        Span(p['label'] + ":", cls="text-xs text-muted-foreground w-20"),
+        Span(p['label'] + ":", cls=f"{TEXT_MUTED_XS} w-20"),
         Input(type="text", name=p['name'], placeholder=p.get('placeholder', ''),
               cls=f"{INPUT} w-32"),
-        cls="gap-2"
+        cls=GAP_2
     ) for p in params]
-    return Div(*inputs, cls="flex gap-4 mt-2", id=f"job-params-{job['key']}")
+    return Div(*inputs, cls=f"flex {GAP_4} mt-2", id=f"job-params-{job['key']}")
 
 
 def job_row(job, status, last_run, last_result):
@@ -409,12 +411,12 @@ def job_row(job, status, last_run, last_result):
                    hx_swap="outerHTML",
                    hx_include=f"#job-params-{job['key']}") if not is_running else
             Button("Running...", cls=BTN_MUTED, disabled=True),
-            cls="gap-4"
+            cls=GAP_4
         ),
         params_form,
         P(f"Error: {last_result}", cls="text-xs text-destructive mt-1") if status == 'failed' and last_result else None,
         id=f"job-{job['key']}",
-        cls="py-3 border-b border-border"
+        cls=ROW_BORDER
     )
     if is_running:
         row = Div(row,

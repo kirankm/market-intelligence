@@ -1,8 +1,7 @@
 """CLI entry point for the newsfeed pipeline."""
 
 import argparse, logging
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 

@@ -1,7 +1,6 @@
 from fasthtml.common import *
 from monsterui.all import *
-from dotenv import load_dotenv
-load_dotenv()
+import newsfeed.env  # noqa: F401 — load .env once
 from newsfeed.storage.database import get_session
 from newsfeed.web.routes.auth import ar as auth_routes
 from newsfeed.web.routes.feed import ar as feed_routes
