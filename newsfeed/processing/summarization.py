@@ -3,6 +3,7 @@
 import os, json, re, time, logging
 from google import genai
 from newsfeed.cost import track_usage
+from newsfeed.config import DEFAULT_MODEL, MODELS_WITH_JSON_MODE
 
 log = logging.getLogger("newsfeed.processing")
 
@@ -101,7 +102,6 @@ def extract_json(text: str) -> dict:
 def summarize(text: str, url: str = "", model: str = None,
               max_retries: int = 3, retry_delay: float = 2.0) -> dict:
     """Generate subtitle + bullet summary with retry logic."""
-    from newsfeed.config import DEFAULT_MODEL, MODELS_WITH_JSON_MODE
     if model is None: model = DEFAULT_MODEL
     client = _get_client()
     use_json_mode = model in MODELS_WITH_JSON_MODE

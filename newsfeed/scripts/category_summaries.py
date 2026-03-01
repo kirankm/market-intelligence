@@ -12,6 +12,7 @@ from newsfeed.storage.models import (
     Article, ArticleTag, Tag, CategorySummary, AppSetting
 )
 from newsfeed.cost import track_usage
+from newsfeed.config import DEFAULT_MODEL
 
 log = logging.getLogger("newsfeed.scripts.category_summaries")
 
@@ -76,7 +77,6 @@ Articles:
 def generate_summary(tag_name: str, articles: list[Article],
                      date_from: date, date_to: date,
                      model: str = None) -> str:
-    from newsfeed.config import DEFAULT_MODEL
     if model is None: model = DEFAULT_MODEL
     article_text = "\n\n".join(
         f"- {a.title} ({a.date}): {a.content[:500] if a.content else ''}"
