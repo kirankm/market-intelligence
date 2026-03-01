@@ -3,6 +3,7 @@
 import logging
 from newsfeed.storage.database import get_session
 from newsfeed.storage.models import Article, ArticleSummary, ArticleTag, Tag
+from newsfeed.storage.repository import _get_or_create_tag
 from newsfeed.processing.summarization import summarize
 from newsfeed.processing.tagging import auto_tag
 from newsfeed.processing.extraction import extract_jina_meta, extract_body_by_markers, extract_body_by_heuristic
@@ -12,15 +13,6 @@ from newsfeed.fetch.client import jina_fetch
 import httpx
 
 log = logging.getLogger("newsfeed.backfill")
-
-
-def _get_or_create_tag(session, tag_name):
-    tag = session.query(Tag).filter_by(name=tag_name).first()
-    if not tag:
-        tag = Tag(name=tag_name)
-        session.add(tag)
-        session.flush()
-    return tag
 
 
 def get_articles_missing_summaries(session):
@@ -142,9 +134,10 @@ def backfill_tags(session, articles):
     return fixed
 
 
-def run_backfill():
+def run_backfill(db=None):
     """Find and fix all articles with missing summaries or tags."""
-    session = get_session()
+    owns_session = db is None
+    session = db if db else get_session()
     try:
         # Backfill summaries
         missing_summaries = get_articles_missing_summaries(session)
@@ -159,4 +152,5 @@ def run_backfill():
         log.info(f"Backfill complete: {fixed_summaries} summaries fixed, {fixed_tags} tags fixed")
         return {"summaries_fixed": fixed_summaries, "tags_fixed": fixed_tags}
     finally:
-        session.close()
+        if owns_session:
+            session.close()

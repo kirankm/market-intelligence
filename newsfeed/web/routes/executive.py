@@ -2,11 +2,8 @@
 from fasthtml.common import *
 from fasthtml.core import APIRouter
 
-import threading
 from newsfeed.web.components.nav import navbar
 from newsfeed.web.filters import FilterState, date_range
-
-from newsfeed.storage.database import get_session
 
 from newsfeed.web.components.cards import (
     collapsible_section, article_card, tag_filter, source_filter,
@@ -27,8 +24,6 @@ from newsfeed.web.queries.feed import (
     search_articles, create_keyword_summary, get_keyword_summary,
     get_recent_keyword_summaries, delete_keyword_summary
 )
-
-from newsfeed.web.scripts.keyword_summarizer import run_once
 
 ar = APIRouter()
 
@@ -304,20 +299,4 @@ def delete(summary_id: int, session, request):
     summaries = get_recent_keyword_summaries(db, user_id)
     return keyword_summaries_list(summaries)
 
-@ar('/executive/search/summarize')
-def post(session, request, search: str = ''):
-    db = request.state.db
-    user_id = session.get('user_id')
-    articles = search_articles(db, search) if search else []
-    create_keyword_summary(db, search, len(articles), user_id)
-    def _run_summarizer():
-        import logging
-        try:
-            sdb = get_session()
-            run_once(sdb)
-            sdb.close()
-        except Exception as e:
-            logging.error(f"Keyword summarizer thread failed: {e}")
-    threading.Thread(target=_run_summarizer, daemon=True).start()
-    summaries = get_recent_keyword_summaries(db, user_id)
-    return keyword_summaries_list(summaries)
+

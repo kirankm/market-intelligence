@@ -19,7 +19,8 @@ class DBSessionMiddleware(BaseHTTPMiddleware):
             request.state.db.close()
 
 hdrs = Theme.blue.headers()
-app, rt = fast_app(hdrs=hdrs, secret_key='dev-secret')
+import os, secrets
+app, rt = fast_app(hdrs=hdrs, secret_key=os.environ.get('SECRET_KEY', secrets.token_hex(32)))
 app.add_middleware(DBSessionMiddleware)
 
 auth_routes.to_app(app)

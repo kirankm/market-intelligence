@@ -65,32 +65,41 @@ def load_all_site_configs() -> dict[str, SiteConfig]:
         configs[path.stem] = SiteConfig(**data)
     return configs
 
-# ── State Persistence ───────────────────────────────────────
+# ── State Persistence (DB-backed) ───────────────────────────
 
-STATE_DIR = Path(__file__).parent / "state"
+def load_state(site_name: str, db=None) -> SiteState:
+    """Load SiteState from the sources table, or return fresh state."""
+    from newsfeed.storage.database import get_session
+    from newsfeed.storage.models import Source
+    owns_session = db is None
+    if owns_session:
+        db = get_session()
+    try:
+        source = db.query(Source).filter_by(name=site_name).first()
+        if source:
+            return SiteState(
+                name=site_name,
+                last_pulled_at=source.last_pulled_at,
+                last_article_date=source.last_article_date,
+            )
+        return SiteState(name=site_name)
+    finally:
+        if owns_session:
+            db.close()
 
-def load_state(site_name: str) -> SiteState:
-    """Load SiteState from JSON file, or return fresh state."""
-    STATE_DIR.mkdir(exist_ok=True)
-    path = STATE_DIR / f"{site_name}_state.json"
-    if path.exists():
-        with open(path) as f:
-            data = json.load(f)
-        return SiteState(
-            name=data["name"],
-            last_pulled_at=datetime.fromisoformat(data["last_pulled_at"]) if data.get("last_pulled_at") else None,
-            last_article_date=data.get("last_article_date"),
-        )
-    return SiteState(name=site_name)
-
-def save_state(state: SiteState):
-    """Save SiteState to JSON file."""
-    STATE_DIR.mkdir(exist_ok=True)
-    path = STATE_DIR / f"{state.name}_state.json"
-    data = {
-        "name": state.name,
-        "last_pulled_at": state.last_pulled_at.isoformat() if state.last_pulled_at else None,
-        "last_article_date": state.last_article_date,
-    }
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2)
+def save_state(state: SiteState, db=None):
+    """Save SiteState to the sources table."""
+    from newsfeed.storage.database import get_session
+    from newsfeed.storage.models import Source
+    owns_session = db is None
+    if owns_session:
+        db = get_session()
+    try:
+        source = db.query(Source).filter_by(name=state.name).first()
+        if source:
+            source.last_pulled_at = state.last_pulled_at
+            source.last_article_date = state.last_article_date
+            db.commit()
+    finally:
+        if owns_session:
+            db.close()

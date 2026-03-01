@@ -48,6 +48,8 @@ class Source(Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
     last_success: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_failure: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_article_date: Mapped[Optional[str]] = mapped_column(Text)
+    last_pulled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
