@@ -3,19 +3,14 @@ from fasthtml.common import *
 from monsterui.all import DivLAligned
 from urllib.parse import urlencode
 from newsfeed.web.filters import FilterState
+from newsfeed.web.components.styles import (
+    PILL, PILL_ACTIVE, PILL_INACTIVE, PILL_CLEAR, PILL_MORE,
+    BTN_SUCCESS, BTN_WARNING, BTN_PRIMARY, INPUT_EXEC, TEXT_LABEL, TEXT_SECTION_TITLE
+)
 import json
 
-# ── Shared Pill Styles ──────────────────────────────────────
-
-PILL = "text-xs px-2 py-0.5 rounded-full cursor-pointer transition"
-PILL_ACTIVE = f"{PILL} bg-primary text-primary-foreground font-semibold"
-PILL_INACTIVE = f"{PILL} bg-muted text-muted-foreground hover:bg-accent"
-PILL_CLEAR = f"{PILL} bg-destructive/10 text-destructive hover:bg-destructive/20"
-PILL_MORE = f"{PILL} bg-muted text-muted-foreground hover:bg-accent"
-BTN_SUCCESS = "text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
-BTN_WARNING = "text-xs px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition"
-BTN_PRIMARY = "text-xs px-3 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
-EXEC_INPUT = "text-sm border border-input rounded px-2.5 py-1.5 bg-background text-foreground w-full focus:outline-none focus:ring-1 focus:ring-ring transition"
+# Re-export for backward compatibility
+EXEC_INPUT = INPUT_EXEC
 
 # ── URL Helper ──────────────────────────────────────────────
 
@@ -77,7 +72,7 @@ def tag_filter(tags_with_counts, state, top_n=5):
     if not state.expanded and rest_count > 0: pills.append(more_pill(rest_count, state))
     if state.expanded and rest_count > 0: pills.append(less_pill(state))
     return DivLAligned(
-        Span("Tags:", cls="text-sm font-medium text-foreground"), *pills,
+        Span("Tags:", cls=TEXT_LABEL), *pills,
         cls="gap-2 flex-wrap"
     )
 
@@ -89,7 +84,7 @@ def source_filter(sources_with_counts, state):
         options.append(Option(f"{name} ({count})", value=name, selected=name == state.source))
     other_params = {k: v for k, v in state.to_params().items() if k != 'source' and v}
     return DivLAligned(
-        Span("Source:", cls="text-sm font-medium text-foreground"),
+        Span("Source:", cls=TEXT_LABEL),
         Select(*options, name="source",
                hx_get=state.base, hx_target=f"#{state.target}", hx_swap="outerHTML",
                hx_include="this", hx_vals=json.dumps(other_params),
@@ -112,7 +107,7 @@ def date_filter(state):
     """Render date filter buttons."""
     buttons = [('Today', 'today'), ('This Week', 'week'), ('This Month', 'month')]
     return DivLAligned(
-        Span("Date:", cls="text-sm font-medium text-foreground"),
+        Span("Date:", cls=TEXT_LABEL),
         *[date_button(label, period, state) for label, period in buttons],
         cls="gap-2"
     )
@@ -139,7 +134,7 @@ def collapsible_section(title, content, section_id, open=False):
     icon = "▼" if open else "►"
     return Div(
         Div(
-            Span(f"{icon} {title}", cls="text-base font-semibold text-foreground cursor-pointer"),
+            Span(f"{icon} {title}", cls=TEXT_SECTION_TITLE),
             hx_get=f"/executive/section/{section_id}?open={'0' if open else '1'}",
             hx_target=f"#section-{section_id}",
             hx_swap="outerHTML",
@@ -164,7 +159,7 @@ def category_period_dropdown(periods, active_from=None, active_to=None):
         selected = (df == active_from and dt == active_to)
         options.append(Option(label, value=f"{df}|{dt}", selected=selected))
     return DivLAligned(
-        Span("Period:", cls="text-sm font-medium text-foreground"),
+        Span("Period:", cls=TEXT_LABEL),
         Select(*options, name="period",
                hx_get="/executive/categories",
                hx_target="#categories-content",

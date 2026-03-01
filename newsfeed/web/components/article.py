@@ -1,12 +1,17 @@
 """Article card components — cards, tags, stars, summaries."""
 from fasthtml.common import *
 from monsterui.all import Card, ButtonT, DivHStacked, DivLAligned, Loading
+from newsfeed.web.components.styles import (
+    PILL_TAG, PILL_TAG_REMOVE, BTN_PRIMARY, BTN_MUTED,
+    TEXT_MUTED, TEXT_MUTED_XS, TEXT_ITALIC, TEXT_LINK,
+    ROW_HOVER, ROW_EXPANDED, INPUT
+)
 import re as re_module
 
 
 def tag_pill(name):
     """Render a single tag pill."""
-    return Span(name, cls="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full")
+    return Span(name, cls=PILL_TAG)
 
 
 def tag_display(article_id, tags):
@@ -29,7 +34,7 @@ def tag_editor(article_id, current_tags, all_tags):
     current_pills = [
         Span(
             t, " ✕",
-            cls="text-xs px-2 py-0.5 bg-destructive/10 text-destructive rounded-full cursor-pointer hover:bg-destructive/20",
+            cls=PILL_TAG_REMOVE,
             hx_post=f"/feed/article/{article_id}/tags/remove?tag_name={t}",
             hx_target=f"#tags-{article_id}",
             hx_swap="outerHTML",
@@ -49,14 +54,14 @@ def tag_editor(article_id, current_tags, all_tags):
               cls="text-xs px-1 py-0.5 rounded border ml-1",
               style="display:none"),
         Button("Add", type="submit",
-               cls="text-xs px-2 py-0.5 bg-primary text-primary-foreground rounded ml-1"),
+               cls=f"{BTN_PRIMARY} ml-1"),
         hx_post=f"/feed/article/{article_id}/tags/add",
         hx_target=f"#tags-{article_id}",
         hx_swap="outerHTML",
         cls="flex items-center"
     )
 
-    done_btn = Span("✓ Done", cls="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded cursor-pointer hover:bg-muted/80 ml-2",
+    done_btn = Span("✓ Done", cls=f"{BTN_MUTED} cursor-pointer hover:bg-muted/80 ml-2",
                     hx_get=f"/feed/article/{article_id}/tags/done",
                     hx_target=f"#tags-{article_id}",
                     hx_swap="outerHTML")
@@ -73,10 +78,10 @@ def card_meta(article, source_name, tags):
     """Render date, source, and tags row."""
     date_str = article.date.strftime("%d %b %Y") if article.date else "No date"
     return DivLAligned(
-        Span(date_str, cls="text-xs text-muted-foreground"),
-        Span("•", cls="text-xs text-muted-foreground"),
-        Span(source_name, cls="text-xs text-muted-foreground"),
-        Span("•", cls="text-xs text-muted-foreground") if tags else None,
+        Span(date_str, cls=TEXT_MUTED_XS),
+        Span("•", cls=TEXT_MUTED_XS),
+        Span(source_name, cls=TEXT_MUTED_XS),
+        Span("•", cls=TEXT_MUTED_XS) if tags else None,
         tag_display(article.id, tags),
         cls="gap-1.5 flex-wrap mt-0.5"
     )
@@ -101,12 +106,12 @@ def highlight(text, term):
 
 def summary_section(summary, search=''):
     """Render subtitle and bullets from summary."""
-    if not summary: return P("No summary available", cls="text-sm text-muted-foreground italic")
+    if not summary: return P("No summary available", cls=TEXT_ITALIC)
     bullets = summary.bullets or []
     subtitle = highlight(summary.subtitle, search) if search else summary.subtitle
     return Div(
         P(subtitle, cls="text-sm font-medium mt-2") if summary.subtitle else None,
-        Ul(*[Li(highlight(b, search) if search else b, cls="text-sm text-muted-foreground")
+        Ul(*[Li(highlight(b, search) if search else b, cls=TEXT_MUTED)
              for b in bullets], cls="list-disc ml-5 mt-1"),
     )
 
@@ -119,7 +124,7 @@ def article_card(article, tags, starred, search=''):
         DivHStacked(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition"),
+                Div(Strong(title, cls=TEXT_LINK),
                     hx_get=f"/feed/article/{article.id}/expand?search={search}",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML",
@@ -129,7 +134,7 @@ def article_card(article, tags, starred, search=''):
             ),
             cls="gap-3 items-start"
         ),
-        cls="py-3 px-4 border-b border-border hover:bg-muted/50 transition",
+        cls=ROW_HOVER,
         id=f"article-{article.id}"
     )
 
@@ -142,7 +147,7 @@ def expanded_card(article, tags, starred, summary, search=''):
         DivHStacked(
             star_icon(starred, article.id),
             Div(
-                Div(Strong(title, cls="cursor-pointer text-foreground hover:text-primary transition"),
+                Div(Strong(title, cls=TEXT_LINK),
                     hx_get=f"/feed/article/{article.id}/collapse",
                     hx_target=f"#article-{article.id}",
                     hx_swap="outerHTML"),
@@ -154,7 +159,7 @@ def expanded_card(article, tags, starred, summary, search=''):
             ),
             cls="gap-3 items-start"
         ),
-        cls="py-3 px-4 border-b border-border bg-muted/50 expanded",
+        cls=f"{ROW_EXPANDED} expanded",
         id=f"article-{article.id}"
     )
 
