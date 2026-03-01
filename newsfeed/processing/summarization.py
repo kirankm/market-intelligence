@@ -1,7 +1,6 @@
 """AI summarization using Gemini with retry + failure tracking."""
 
 import os, json, re, time, logging
-from pathlib import Path
 from google import genai
 from newsfeed.cost import track_usage
 
@@ -42,39 +41,30 @@ Article:
 
 # ── Failure Tracking ────────────────────────────────────────
 
-FAILURES_PATH = Path(__file__).parent.parent / "state" / "failures.json"
-
-def _load_failures() -> list[dict]:
-    FAILURES_PATH.parent.mkdir(exist_ok=True)
-    if FAILURES_PATH.exists():
-        with open(FAILURES_PATH) as f:
-            return json.load(f)
-    return []
-
-def _save_failures(failures: list[dict]):
-    FAILURES_PATH.parent.mkdir(exist_ok=True)
-    with open(FAILURES_PATH, "w") as f:
-        json.dump(failures, f, indent=2, default=str)
-
-def log_failure(url: str, step: str, error: str, retries: int):
-    """Append a failure record, preserving existing ones."""
-    failures = _load_failures()
-    # Update existing entry or add new
-    for f in failures:
-        if f["url"] == url and f["step"] == step:
-            f["error"] = error
-            f["retries"] = retries
-            f["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-            _save_failures(failures)
-            return
-    failures.append({
-        "url": url,
-        "step": step,
-        "error": error,
-        "retries": retries,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    })
-    _save_failures(failures)
+def log_failure(url: str, step: str, error: str, retries: int, db=None):
+    """Log a failure record to the database."""
+    from newsfeed.storage.models import Failure
+    own_session = db is None
+    if own_session:
+        from newsfeed.storage.database import get_session
+        db = get_session()
+    try:
+        # Update existing unresolved failure or create new
+        existing = (db.query(Failure)
+                    .filter(Failure.url == url, Failure.step == step, Failure.resolved == False)
+                    .first())
+        if existing:
+            existing.error = error
+            existing.retries = retries
+        else:
+            db.add(Failure(url=url, step=step, error=error, retries=retries))
+        db.commit()
+    except Exception as e:
+        log.error(f"Failed to log failure to DB: {e}")
+        db.rollback()
+    finally:
+        if own_session:
+            db.close()
 
 # ── Gemini Client ───────────────────────────────────────────
 
